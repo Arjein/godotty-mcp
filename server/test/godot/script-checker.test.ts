@@ -97,6 +97,7 @@ describe('ScriptChecker', () => {
     expect(fake.calls[0]?.args).toEqual(
       expect.arrayContaining(['--headless', '--editor', '--path', project.root]),
     );
+    expect(fake.calls[0]?.guarded).toBe(process.platform !== 'win32');
   });
 
   it('falls back to --check-only when no language server comes up', async () => {

@@ -203,7 +203,7 @@ export class GameManager {
       ...bridge.args,
       ...options.args,
     ];
-    const child = this.options.godot.spawn(args, {
+    const child = this.options.godot.spawnGuarded(args, {
       cwd: this.options.projectRoot,
       env: { ...process.env, ...bridge.env },
     });
@@ -245,8 +245,11 @@ export class GameManager {
   private async waitForReady(run: Run): Promise<void> {
     const deadline = Date.now() + (this.options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
     while (Date.now() < deadline && run.state !== 'exited') {
-      if (helperReported(run.eventsFile)) {
+      const ready = readyRecord(run.eventsFile);
+      if (ready !== undefined) {
         run.helperReady = true;
+        // The spawned process may be the process guard; the helper knows Godot's own pid.
+        if (typeof ready.pid === 'number') run.pid = ready.pid;
         run.state = 'running';
         return;
       }
@@ -314,8 +317,8 @@ function readEvents(file: string): Record<string, unknown>[] {
     });
 }
 
-function helperReported(file: string): boolean {
-  return readEvents(file).some((e) => e.event === 'ready');
+function readyRecord(file: string): Record<string, unknown> | undefined {
+  return readEvents(file).find((e) => e.event === 'ready');
 }
 
 function readLoggerRecords(file: string): LoggerRecord[] {

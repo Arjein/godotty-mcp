@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 
 import { ErrorCode, ToolError } from '../util/errors.js';
+import { guardArgs } from './process-guard.js';
 
 export interface GodotVersion {
   major: number;
@@ -40,6 +41,10 @@ export const MIN_GODOT = { major: 4, minor: 5 } as const;
 export const NO_EDITOR_BRIDGE_ENV = 'GODOTTY_NO_EDITOR_BRIDGE';
 const VERSION_TIMEOUT_MS = 15_000;
 const KILL_GRACE_MS = 2_000;
+/** A guarded process escalates to SIGKILL itself; the server only steps in if the guard hangs. */
+const GUARDED_LAST_RESORT_MS = 6_000;
+/** Processes started behind the process guard (see process-guard.ts). */
+const guarded = new WeakSet<ChildProcess>();
 const VERSION_PATTERN = /^(?<major>\d+)\.(?<minor>\d+)(?:\.(?<patch>\d+))?\.(?<status>[a-z0-9_]+)/i;
 /** How much unexpected `--version` output to quote in an error. */
 const OUTPUT_SNIPPET_CHARS = 100;
@@ -85,6 +90,24 @@ export class GodotExecutable {
   public spawn(args: readonly string[], options: SpawnOptions = {}): ChildProcess {
     const env = { ...process.env, ...options.env, [NO_EDITOR_BRIDGE_ENV]: '1' };
     return this.spawner(this.path, args, { stdio: ['ignore', 'pipe', 'pipe'], ...options, env });
+  }
+
+  /**
+   * Starts a long-lived Godot process (game, headless editor) behind the process guard, so it
+   * stops even when the server is killed hard. The returned process is the guard; stop it with
+   * `killGracefully`. On Windows this is a plain `spawn`.
+   */
+  public spawnGuarded(args: readonly string[], options: SpawnOptions = {}): ChildProcess {
+    if (process.platform === 'win32') return this.spawn(args, options);
+    const env = { ...process.env, ...options.env, [NO_EDITOR_BRIDGE_ENV]: '1' };
+    // The guard's stdin is the lifeline: a pipe the server never writes to or closes.
+    const child = this.spawner(process.execPath, [...guardArgs(this.path), ...args], {
+      ...options,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env,
+    });
+    guarded.add(child);
+    return child;
   }
 
   /** Runs Godot to completion, collecting output; kills it after `timeoutMs`. */
@@ -150,9 +173,11 @@ function keepTail(text: string): string {
 export function killGracefully(child: ChildProcess): void {
   if (child.exitCode !== null || child.signalCode !== null) return;
   child.kill('SIGTERM');
+  // SIGKILLing a guard would orphan its Godot, so the guard escalates on its own.
+  const grace = guarded.has(child) ? GUARDED_LAST_RESORT_MS : KILL_GRACE_MS;
   const timer = setTimeout(() => {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-  }, KILL_GRACE_MS);
+  }, grace);
   timer.unref();
 }
 

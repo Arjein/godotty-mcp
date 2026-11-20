@@ -87,6 +87,16 @@ describe('GodotExecutable', () => {
     expect(fake.calls[0]?.env).toMatchObject({ EXTRA: '1', [NO_EDITOR_BRIDGE_ENV]: '1' });
   });
 
+  it.skipIf(process.platform === 'win32')(
+    'starts long-lived processes behind the process guard',
+    () => {
+      const fake = fakeSpawner(() => undefined);
+      new GodotExecutable('g', fake.spawner).spawnGuarded(['--editor'], { env: { EXTRA: '1' } });
+      expect(fake.calls[0]).toMatchObject({ command: 'g', args: ['--editor'], guarded: true });
+      expect(fake.calls[0]?.env).toMatchObject({ EXTRA: '1', [NO_EDITOR_BRIDGE_ENV]: '1' });
+    },
+  );
+
   it('collects stdout/stderr and passes cwd', async () => {
     const fake = fakeSpawner((proc) => {
       proc.stdout.write('out');
@@ -120,6 +130,24 @@ describe('killGracefully', () => {
     expect(proc.signals).toEqual(['SIGTERM', 'SIGKILL']);
     vi.useRealTimers();
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'leaves the SIGKILL escalation of a guarded process to its guard',
+    () => {
+      vi.useFakeTimers();
+      const fake = fakeSpawner(() => undefined);
+      const child = new GodotExecutable('g', fake.spawner).spawnGuarded([]);
+      const proc = fake.processes[0];
+      if (proc === undefined) throw new Error('no process');
+      proc.diesOnKill = false;
+      killGracefully(child);
+      vi.advanceTimersByTime(3000);
+      expect(proc.signals).toEqual(['SIGTERM']);
+      vi.advanceTimersByTime(10_000);
+      expect(proc.signals).toEqual(['SIGTERM', 'SIGKILL']);
+      vi.useRealTimers();
+    },
+  );
 
   it('does nothing for exited processes', () => {
     const proc = new FakeProcess();

@@ -55,6 +55,7 @@ describe('GameManager', () => {
       helperReady: true,
       scene: 'res://a.tscn',
       headless: true,
+      pid: 1, // Godot's own pid from the helper, not the process guard's
     });
     expect(existsSync(path.join(project.root, 'override.cfg'))).toBe(false);
     const gameCall = fake.calls.find((c) => !c.args.includes('--version'));
@@ -66,6 +67,7 @@ describe('GameManager', () => {
       '--',
     ]);
     expect(gameCall?.args.at(-1)).toBe('--level=2');
+    expect(gameCall?.guarded).toBe(process.platform !== 'win32');
     expect(game.isRunning).toBe(true);
     await expect
       .poll(() => game.output({ filter: 'all', limit: 10 }).lines.map((l) => l.text))

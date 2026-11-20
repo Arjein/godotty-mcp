@@ -163,7 +163,7 @@ export class ScriptChecker {
 
   private async startHeadless(): Promise<Session> {
     const port = await findFreePort();
-    const process = this.options.godot.spawn([
+    const process = this.options.godot.spawnGuarded([
       '--headless',
       '--editor',
       '--path',

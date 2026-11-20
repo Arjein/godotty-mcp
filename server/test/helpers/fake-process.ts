@@ -42,6 +42,16 @@ export interface SpawnCall {
   args: readonly string[];
   cwd: string | undefined;
   env: NodeJS.ProcessEnv | undefined;
+  /** Started behind the process guard; `command`/`args` are then Godot's, not the guard's. */
+  guarded: boolean;
+}
+
+/** Splits `node -e <guard> -- <grace> <godot> <args...>` back into the Godot command line. */
+function unwrapGuard(command: string, args: readonly string[]): Omit<SpawnCall, 'cwd' | 'env'> {
+  if (command !== process.execPath || args[0] !== '-e' || args[2] !== '--') {
+    return { command, args, guarded: false };
+  }
+  return { command: args[4] ?? '', args: args.slice(5), guarded: true };
 }
 
 /** A spawner that hands out scripted fake processes and records every call. */
@@ -61,7 +71,11 @@ export function fakeSpawner(onSpawn: (proc: FakeProcess, call: SpawnCall) => voi
     processes,
     spawner: (command, args, options) => {
       const proc = new FakeProcess();
-      const call = { command, args, cwd: options.cwd?.toString(), env: options.env };
+      const call = {
+        ...unwrapGuard(command, args),
+        cwd: options.cwd?.toString(),
+        env: options.env,
+      };
       calls.push(call);
       processes.push(proc);
       setImmediate(() => {
