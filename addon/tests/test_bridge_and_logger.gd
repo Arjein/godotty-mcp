@@ -5,6 +5,15 @@ const BridgeClient = preload("res://addons/godotty_mcp/runtime/godotty_bridge_cl
 const ErrorLogger = preload("res://addons/godotty_mcp/runtime/godotty_error_logger.gd")
 
 
+## Records warnings instead of logging them (GUT 9.5 fails tests on any push_warning).
+class QuietClient:
+	extends BridgeClient
+	var warnings: Array[String] = []
+
+	func _warn(message: String) -> void:
+		warnings.append(message)
+
+
 class FakeCommands:
 	extends RefCounted
 	var calls: Array[Array] = []
@@ -28,7 +37,7 @@ func test_dispatch_runs_requests_with_their_params() -> void:
 
 func test_dispatch_ignores_garbage_and_stops_when_rejected() -> void:
 	var commands: FakeCommands = FakeCommands.new()
-	var client: BridgeClient = BridgeClient.new()
+	var client: QuietClient = QuietClient.new()
 	client.setup(1, "token", commands)
 	client._dispatch("not json")
 	client._dispatch(JSON.stringify([1, 2]))
@@ -36,6 +45,7 @@ func test_dispatch_ignores_garbage_and_stops_when_rejected() -> void:
 	assert_eq(commands.calls.size(), 0)
 	client._dispatch(JSON.stringify({"type": "rejected", "reason": "invalid token"}))
 	assert_true(client._finished)
+	assert_eq(client.warnings, ["godotty-mcp: bridge rejected this game: invalid token"])
 	client.free()
 
 

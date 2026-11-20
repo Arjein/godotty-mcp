@@ -31,7 +31,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var error: Error = _tcp.connect_to_host(HOST, _port)
 	if error != OK:
-		push_warning("godotty-mcp: cannot connect to the server bridge (%s)" % error_string(error))
+		_warn("godotty-mcp: cannot connect to the server bridge (%s)" % error_string(error))
 		_finished = true
 
 
@@ -85,7 +85,7 @@ func _dispatch(line: String) -> void:
 		return
 	var data: Dictionary = json.data
 	if data.get("type", "") == "rejected":
-		push_warning("godotty-mcp: bridge rejected this game: %s" % data.get("reason", ""))
+		_warn("godotty-mcp: bridge rejected this game: %s" % data.get("reason", ""))
 		_finished = true
 	elif data.has("id") and data.has("method"):
 		_run(data)
@@ -98,6 +98,11 @@ func _run(request: Dictionary) -> void:
 	)
 	outcome["id"] = int(request["id"])
 	_send(outcome)
+
+
+## Reports a bridge problem to the game's log (overridden in tests).
+func _warn(message: String) -> void:
+	push_warning(message)
 
 
 func _send(message: Dictionary) -> void:
