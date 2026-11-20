@@ -7,8 +7,11 @@
   `"private": true` until release prep (M8).
 - [2026-11-20] Minimum Godot version **4.5** (runtime errors come from the `Logger` API via
   `OS.add_logger`). CI tests the floor and 4.7.2.
-- [2026-11-20] Bridge: the MCP server listens on `127.0.0.1:<random>` (WebSocket); editor plugin
-  and runtime helper connect in. Port + per-session token are written to
+- [2026-11-20] Bridge: the MCP server listens on `127.0.0.1:<random>`; editor plugin and runtime
+  helper connect in. Transport is plain TCP with one JSON object per line (M5: both Godot's
+  StreamPeerTCP and Node's `net` support it natively, no dependency; WebSocket bought nothing on
+  loopback). The runtime's token travels in the `GODOTTY_BRIDGE_TOKEN` env var, not argv (visible
+  to other local users via `ps`). Port + per-session token are written to
   `res://.godot/godotty_mcp/session.json` (editor) or passed as user args (game launched by
   `run_game`).
 - [2026-11-20] Tool set is 21 tools + opt-in `eval_gdscript`: `capture_frames` folded into

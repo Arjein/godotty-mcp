@@ -11,7 +11,7 @@ own tooling, version-correct docs, structured test results, safety, and a small 
 ```
 AI client ──stdio/MCP──► server (Node 20+, TypeScript)
                            ├─ godot/   spawns Godot: headless runs, --doctool, test runners, LSP editor
-                           └─ bridge/  WebSocket on 127.0.0.1:<random>, token-authenticated
+                           └─ bridge/  TCP (JSON lines) on 127.0.0.1:<random>, token-authenticated
                                  ▲                        ▲
                      editor plugin (connects in)   runtime helper autoload (game launched by run_game)
 ```
@@ -38,8 +38,8 @@ AI client ──stdio/MCP──► server (Node 20+, TypeScript)
 
 ## Bridge protocol
 
-Single source: `server/src/bridge/protocol.ts` (zod schemas) with a generated GDScript constants
-file.
+Single source: `server/src/bridge/protocol.ts`, mirrored by the GDScript bridge client (TCP, one JSON
+object per line).
 
 - Handshake: `hello {protocol, role: "editor"|"runtime", addonVersion, godotVersion, token}` →
   `welcome` or `error` (with a mismatch hint).

@@ -3,6 +3,14 @@ import { godotDocs } from './docs.js';
 import { listFiles, projectInfo, readScene } from './project.js';
 import type { ToolDefinition } from './registry.js';
 import { getOutput, runGame, stopGame } from './run.js';
+import {
+  getNodeProperties,
+  inspectSceneTree,
+  screenshot,
+  sendInput,
+  setNodeProperty,
+  wait,
+} from './runtime.js';
 import { runTests } from './tests.js';
 
 /**
@@ -19,5 +27,11 @@ export const ALL_TOOLS = [
   runGame,
   stopGame,
   getOutput,
+  screenshot,
+  sendInput,
+  wait,
+  inspectSceneTree,
+  getNodeProperties,
+  setNodeProperty,
   runTests,
 ] as unknown as readonly ToolDefinition[];

@@ -29,15 +29,20 @@ Known problems: `FLAGS.md`.
   - `src/godot/tests/` `run_tests` backend: `test-runner.ts` (detect GUT/gdUnit4 by CLI entry
     script, always `--import` first, run with the verified flags, collect parse errors of test
     scripts) and `junit.ts` (both frameworks' JUnit dialects → `TestSuite`/`TestCase`).
-  - `src/bridge/` WebSocket server for the editor plugin and runtime helper; protocol types live in
-    one file (`protocol.ts`), versioned.
+  - `src/bridge/` TCP bridge to Godot: `protocol.ts` (the single source for messages, methods and
+    `PROTOCOL_VERSION`; one JSON object per line), `bridge-server.ts` (loopback listener, token
+    hello, request/response with timeouts), `runtime-client.ts` (calls into the running game,
+    maps remote error codes to actionable `ToolError`s). The GDScript side mirrors `protocol.ts`.
   - `src/util/` `errors.ts` (ToolError + codes), `sandbox.ts` (path resolution), `paginate.ts`.
   - `test/` Vitest unit tests mirror `src/`; `test/integration/` runs real Godot (excluded from
     `npm test`).
 - `addon/addons/godotty_mcp/` — GDScript editor plugin + runtime helper (`runtime/`). The server
   copies `runtime/*.gd` into `<project>/.godot/godotty_mcp/runtime/` at each launch; the helper is
   inert unless started with `-- --godotty-events=<file>` and writes JSON lines there (`ready`,
-  `error`).
+  `error`). With `--godotty-port=<port>` plus the `GODOTTY_BRIDGE_TOKEN` env var (never argv) it
+  connects to the bridge: `godotty_bridge_client.gd` (TCP + dispatch), `godotty_commands.gd`
+  (screenshot, wait, tree, get/set props), `godotty_input.gd` (input simulation). Its GUT tests are
+  in `addon/tests/` (not shipped) and run via `test/integration/addon.test.ts`.
 - `examples/demo-project/` — small Godot 4 3D project (GL Compatibility renderer, so it renders under
   Mesa/xvfb on CI) for demos and integration tests. Its GUT tests (`test/unit/`) need GUT:
   `scripts/fetch-test-addons.sh gut examples/demo-project` (addons/gut is gitignored).
@@ -75,6 +80,8 @@ Known problems: `FLAGS.md`.
 - Commit `*.uid` files Godot generates next to scripts; never commit `.godot/`.
 - Copy the demo project in tests with `copyDemoProject` (skips `.godot` and locally installed test
   addons); integration tests install frameworks with `installTestAddon`.
+- `test/helpers/fake-runtime.ts` plays the runtime helper over real TCP for bridge/tool tests.
+- Integration tests open real game windows for screenshots (CI: Xvfb + Mesa llvmpipe).
 - Tests fake Godot with `test/helpers/fake-godot.ts` (scripted processes) and
   `test/helpers/fake-lsp.ts` (TCP language server); tool tests go through a real MCP client
   (`test/helpers/tool-client.ts`).

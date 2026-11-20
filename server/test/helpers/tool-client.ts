@@ -46,7 +46,7 @@ export async function connectTools(
     call: async (name, args = {}) => {
       const result = (await client.callTool({ name, arguments: args })) as CallToolResult;
       return {
-        text: result.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n'),
+        text: result.content.flatMap((c) => (c.type === 'text' ? [c.text] : [])).join('\n'),
         isError: result.isError === true,
       };
     },

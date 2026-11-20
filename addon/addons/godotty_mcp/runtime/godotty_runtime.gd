@@ -7,8 +7,13 @@ extends Node
 ## Bumped when the events-file or bridge format changes; the server checks it on "ready".
 const PROTOCOL_VERSION: int = 1
 const EVENTS_ARG: String = "--godotty-events="
+const PORT_ARG: String = "--godotty-port="
+## The session token comes from the environment (not argv, which other local users can read).
+const TOKEN_ENV: String = "GODOTTY_BRIDGE_TOKEN"
 const READY_EVENT: String = "ready"
 const ErrorLogger = preload("godotty_error_logger.gd")
+const BridgeClient = preload("godotty_bridge_client.gd")
+const Commands = preload("godotty_commands.gd")
 
 var _events: FileAccess
 var _logger: ErrorLogger
@@ -27,6 +32,8 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_start_bridge()
 	if _logger == null:
 		return
 	var ready_record: Dictionary = {
@@ -45,6 +52,18 @@ func _exit_tree() -> void:
 	if _events != null:
 		_events.close()
 		_events = null
+
+
+## Connects to the server bridge when the launch passed a port and token.
+func _start_bridge() -> void:
+	var port: String = _user_arg(PORT_ARG)
+	var token: String = OS.get_environment(TOKEN_ENV)
+	if not port.is_valid_int() or token.is_empty():
+		return
+	var client: BridgeClient = BridgeClient.new()
+	client.name = "Bridge"
+	client.setup(port.to_int(), token, Commands.new(self))
+	add_child(client)
 
 
 ## Returns the value of a `--name=value` user argument, or "" when absent.

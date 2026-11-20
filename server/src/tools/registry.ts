@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
+import type { RuntimeClient } from '../bridge/runtime-client.js';
 import type { ServerConfig } from '../config.js';
 import type { DocsStore } from '../godot/docs/docs-store.js';
 import type { GodotExecutable } from '../godot/executable.js';
@@ -20,6 +21,7 @@ export interface ToolContext {
   checker: ScriptChecker;
   docs: DocsStore;
   tests: TestRunner;
+  runtime: RuntimeClient;
 }
 
 /**

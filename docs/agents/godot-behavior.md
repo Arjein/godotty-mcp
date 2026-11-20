@@ -64,3 +64,18 @@ script_backtraces: Array[ScriptBacktrace])`, `_log_message(message, error)`;
   No CLI filter by test name (only `-i` ignore lists).
 - A test script with a parse error is silently skipped by both; the only trace is a
   `SCRIPT ERROR: Parse Error:` block in the run output.
+
+## Rendering, input and frames (runtime helper)
+
+- Screenshot = `get_viewport().get_texture().get_image()` after `await
+RenderingServer.frame_post_draw`. **Headless never emits `frame_post_draw` — awaiting it hangs
+  forever**; check `DisplayServer.get_name() == "headless"` first.
+- `Input.parse_input_event()` events (InputEventAction, InputEventKey with physical_keycode) drive
+  `is_action_pressed` and `_input` handlers, windowed or headless — but Input state updates **on
+  the next frame**, not immediately. Keys trigger actions bound to them in the InputMap.
+- The first `await get_tree().process_frame` can resume in the current frame; count frames with
+  `Engine.get_process_frames()` instead of awaiting N times.
+- Comparing values of different Variant types (e.g. `Vector3 != Vector2.ZERO`) is a runtime error
+  in GDScript, not `false`; check types first.
+- `JSON.parse_string()` logs an engine error on malformed input; `JSON.new().parse()` does not.
+- `.tscn` writes `Transform3D(...)` basis values **row by row** (xx, xy, xz, yx, …), then origin.

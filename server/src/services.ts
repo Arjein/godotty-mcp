@@ -1,6 +1,8 @@
 import { homedir } from 'node:os';
 import path from 'node:path';
 
+import { BridgeServer } from './bridge/bridge-server.js';
+import { RuntimeClient } from './bridge/runtime-client.js';
 import type { ServerConfig } from './config.js';
 import { DocsStore, httpFetchText, type TextFetcher } from './godot/docs/docs-store.js';
 import { GodotExecutable, type Spawner } from './godot/executable.js';
@@ -36,7 +38,8 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
   const injection = new RuntimeInjection(sandbox.root, findRuntimeSourceDir());
   // Clean up after a previous server that crashed mid-launch.
   injection.recover();
-  const game = new GameManager({ godot, projectRoot: sandbox.root, injection });
+  const bridge = new BridgeServer();
+  const game = new GameManager({ godot, projectRoot: sandbox.root, injection, bridge });
   const checker = new ScriptChecker({
     godot,
     projectRoot: sandbox.root,
@@ -56,9 +59,11 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
     checker,
     docs,
     tests: new TestRunner(godot, sandbox.root),
+    runtime: new RuntimeClient(bridge, game),
     dispose: () => {
       game.dispose();
       checker.dispose();
+      bridge.close();
     },
   };
 }

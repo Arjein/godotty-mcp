@@ -10,6 +10,11 @@ All notable changes to this project are documented here. The format follows
 
 - Project named **Godotty** (npm package `godotty-mcp`, addon `addons/godotty_mcp`).
 - Repository skeleton: MCP server package (TypeScript, stdio), editor addon stub, demo project, CI.
+- See and play the running game: `screenshot` (images, frame sequences), `send_input` (actions,
+  keys, mouse, holds, waits; optional screenshot after), `wait` (frames, seconds, or a node/property
+  condition), `inspect_scene_tree`, `get_node_properties`, `set_node_property` — over a
+  token-authenticated loopback bridge to the runtime helper. Headless runs refuse screenshots
+  instead of hanging.
 - `run_tests`: GUT and gdUnit4 (auto-detected), headless with JUnit results — totals, failures with
   file:line, skipped tests, warnings for tests that never reported, and test scripts that failed
   to load (which both frameworks skip silently).

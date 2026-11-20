@@ -76,5 +76,8 @@ jobs:
           path: ~/.cache/godotty-mcp/test-addons
           key: test-addons-${{ hashFiles('scripts/fetch-test-addons.sh') }}
       - run: ${{ env.GODOT_PATH }} --version
+      - name: Install virtual display and software OpenGL
+        # Windowed runs (screenshots) render through Mesa llvmpipe under Xvfb.
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb libgl1-mesa-dri libglx-mesa0
       - run: npm ci
-      - run: npm run test:integration
+      - run: xvfb-run -a -s "-screen 0 1280x1024x24" npm run test:integration

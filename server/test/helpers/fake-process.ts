@@ -41,6 +41,7 @@ export interface SpawnCall {
   command: string;
   args: readonly string[];
   cwd: string | undefined;
+  env: NodeJS.ProcessEnv | undefined;
 }
 
 /** A spawner that hands out scripted fake processes and records every call. */
@@ -48,7 +49,7 @@ export function fakeSpawner(onSpawn: (proc: FakeProcess, call: SpawnCall) => voi
   spawner: (
     command: string,
     args: readonly string[],
-    options: { cwd?: string | URL },
+    options: { cwd?: string | URL; env?: NodeJS.ProcessEnv },
   ) => ChildProcess;
   calls: SpawnCall[];
   processes: FakeProcess[];
@@ -60,7 +61,7 @@ export function fakeSpawner(onSpawn: (proc: FakeProcess, call: SpawnCall) => voi
     processes,
     spawner: (command, args, options) => {
       const proc = new FakeProcess();
-      const call = { command, args, cwd: options.cwd?.toString() };
+      const call = { command, args, cwd: options.cwd?.toString(), env: options.env };
       calls.push(call);
       processes.push(proc);
       setImmediate(() => {
