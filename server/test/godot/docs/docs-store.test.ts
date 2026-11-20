@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 
 import { DocsStore, httpFetchText, sourceRefs } from '../../../src/godot/docs/docs-store.js';
 import {
@@ -133,14 +133,19 @@ describe('DocsStore', () => {
       fetchText: () => Promise.resolve(undefined),
       offline: false,
     });
+    // Another test file's doctool run may be using the shared tmpdir at the same time.
+    const foreign = mkdtempSync(path.join(tmpdir(), 'godotty-doctool-'));
+    mkdirSync(path.join(foreign, 'doc'));
+    onTestFinished(() => {
+      rmSync(foreign, { recursive: true, force: true });
+    });
     await expect(docs.api()).rejects.toThrow(/produced no class reference \(exit 1\)/);
     await expect(docs.api()).rejects.toThrow(/produced no class reference/);
-    expect(broken.calls.filter((c) => c.args.includes('--doctool'))).toHaveLength(2);
-    expect(
-      readdirSync(tmpdir()).some(
-        (d) => d.startsWith('godotty-doctool-') && existsSync(path.join(tmpdir(), d, 'doc')),
-      ),
-    ).toBe(false);
+    const doctoolCalls = broken.calls.filter((c) => c.args.includes('--doctool'));
+    expect(doctoolCalls).toHaveLength(2);
+    // Each run's own temp folder is cleaned up (the folder follows --doctool in its args).
+    const used = doctoolCalls.map((c) => c.args[c.args.indexOf('--doctool') + 1] ?? '');
+    expect(used.every((dir) => dir.includes('godotty-doctool-') && !existsSync(dir))).toBe(true);
   });
 });
 
