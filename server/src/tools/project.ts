@@ -4,6 +4,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { formatVersion } from '../godot/executable.js';
+import { describeInstall, installAddon } from '../install-addon.js';
 import { parseProjectFile, type ProjectSettings } from '../godot/project-file.js';
 import { parseSceneFile, renderScene, SceneFormatError } from '../godot/scene-file.js';
 import { SectionFileError } from '../godot/section-file.js';
@@ -67,10 +68,41 @@ async function describeProject(ctx: ToolContext): Promise<string> {
     ),
     ...section(`Enabled plugins (${settings.enabledPlugins.length})`, settings.enabledPlugins),
     `Game: ${describeGame(ctx)}`,
-    'Editor bridge: not connected (editor tools need the Godotty addon; arrives in a later version).',
+    `Editor bridge: ${describeEditor(ctx, settings.enabledPlugins)}`,
   ];
   return lines.join('\n');
 }
+
+const ADDON_PLUGIN = 'res://addons/godotty_mcp/plugin.cfg';
+
+function describeEditor(ctx: ToolContext, enabledPlugins: readonly string[]): string {
+  if (ctx.editor.isConnected) return 'connected (editor tools work on the open scene)';
+  if (enabledPlugins.includes(ADDON_PLUGIN))
+    return 'not connected (the Godotty plugin is enabled; open this project in the Godot editor)';
+  const installed = existsSync(path.join(ctx.sandbox.root, 'addons', 'godotty_mcp', 'plugin.cfg'));
+  return installed
+    ? 'not connected (the Godotty plugin is installed but not enabled: Project Settings → Plugins)'
+    : 'not connected (editor tools need the Godotty plugin: install it with install_addon, enable it in Project Settings → Plugins, open the project in the editor)';
+}
+
+export const installAddonTool = defineTool({
+  name: 'install_addon',
+  title: 'Install editor addon',
+  description:
+    "Copies the Godotty editor plugin (this server's version) into res://addons/godotty_mcp, which the " +
+    'editor tools (open_scene, add_node, …, target="editor") need. Adds files to the project, so ask ' +
+    'the user first. Afterwards the user enables it in Project Settings → Plugins and keeps the editor ' +
+    'open. force=true replaces an existing copy (e.g. an older version).',
+  inputSchema: {
+    force: z.boolean().default(false).describe('Replace an existing addons/godotty_mcp.'),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  handler: (args, ctx) => {
+    // Refuses an addons/ folder that links outside the project before anything is written.
+    ctx.sandbox.resolve('res://addons');
+    return Promise.resolve(textResult(describeInstall(installAddon(ctx.sandbox.root, args.force))));
+  },
+});
 
 function section(title: string, items: readonly string[]): string[] {
   return items.length === 0 ? [`${title}: none`] : [`${title}:`, ...items.map((i) => `  ${i}`)];
@@ -120,7 +152,7 @@ export const listFiles = defineTool({
       .string()
       .optional()
       .describe(
-        'Glob over res:// paths, e.g. "scenes/**/*.tscn" or "*player*". Supports **, *, ?, {a,b}. No "/" = match file name anywhere.',
+        'Glob over res:// paths, e.g. "scenes/**/*.tscn" or "*player*". Supports **, *, ?, {a,b}. No "/" = match file names only (anywhere); to match folder names use "**/bosses/**".',
       ),
     folder: z.string().default('res://').describe('Folder to list (res:// path).'),
     include_addons: z.boolean().default(false).describe('Also list files under res://addons/.'),

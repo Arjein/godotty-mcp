@@ -2,15 +2,19 @@ import { checkScripts, getErrors } from './diagnostics.js';
 import { godotDocs } from './docs.js';
 import { addNode, openScene, removeNode, saveScene, updateNode } from './editor.js';
 import { evalGdscript } from './eval.js';
-import { listFiles, projectInfo, readScene } from './project.js';
+import { installAddonTool, listFiles, projectInfo, readScene } from './project.js';
 import type { ToolDefinition } from './registry.js';
 import { getOutput, runGame, stopGame } from './run.js';
 import {
   getNodeProperties,
   inspectSceneTree,
+  listControls,
+  pauseGame,
+  pressControl,
   screenshot,
   sendInput,
   setNodeProperty,
+  stepGame,
   wait,
 } from './runtime.js';
 import { runTests } from './tests.js';
@@ -24,6 +28,7 @@ export const ALL_TOOLS = [
   projectInfo,
   listFiles,
   readScene,
+  installAddonTool,
   // Docs and diagnostics
   godotDocs,
   checkScripts,
@@ -35,7 +40,11 @@ export const ALL_TOOLS = [
   // See and play
   screenshot,
   sendInput,
+  listControls,
+  pressControl,
   wait,
+  pauseGame,
+  stepGame,
   inspectSceneTree,
   getNodeProperties,
   setNodeProperty,

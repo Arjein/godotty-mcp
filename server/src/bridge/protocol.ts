@@ -56,6 +56,10 @@ export const RemoteErrorCode = {
   BadParams: 'BAD_PARAMS',
   EvalDisabled: 'EVAL_DISABLED',
   EvalParse: 'EVAL_PARSE',
+  /** press by text matched several controls. */
+  Ambiguous: 'AMBIGUOUS',
+  /** The control is hidden, disabled, or cannot take focus for the requested action. */
+  ControlUnavailable: 'CONTROL_UNAVAILABLE',
 } as const;
 
 // ---------------------------------------------------------------------------------------------
@@ -103,13 +107,79 @@ export type InputStep =
     }
   | { type: 'mouse_motion'; position: [number, number] }
   | { type: 'wait'; ms?: number | undefined; frames?: number | undefined };
+export interface WatchedProperty {
+  node: string;
+  /** Property, sub-property ("position:x") or getter call ("is_open()"). */
+  property: string;
+}
 export interface InputParams {
   steps: InputStep[];
+  /** Sampled every frame while the steps run; only changes are reported. */
+  observe?: WatchedProperty[] | undefined;
+}
+export interface ObservedChange {
+  /** Milliseconds since the batch started. */
+  t_ms: number;
+  /** 1-based step running when the value changed (0 = before the first step). */
+  step: number;
+  /** "node:property". */
+  name: string;
+  value: string;
 }
 export interface InputResult {
   steps: number;
   elapsed_ms: number;
   frames: number;
+  observed?: ObservedChange[];
+  observed_truncated?: boolean;
+}
+
+export interface PauseParams {
+  paused: boolean;
+  time_scale?: number | undefined;
+}
+export interface ClockState {
+  /** godotty holds the game frozen. */
+  paused: boolean;
+  /** The game paused itself (e.g. its pause menu). */
+  game_paused: boolean;
+  time_scale: number;
+  physics_frame: number;
+}
+export interface StepResult extends ClockState {
+  frames: number;
+  elapsed_ms: number;
+}
+
+export interface ControlsParams {
+  /** Start node ("" = whole tree). */
+  path: string;
+  max: number;
+}
+export interface ControlInfo {
+  path: string;
+  class: string;
+  text: string;
+  /** [x, y, width, height] in the control's viewport pixels. */
+  rect: [number, number, number, number];
+  focused: boolean;
+  disabled: boolean;
+}
+export interface ControlsResult {
+  controls: ControlInfo[];
+  total: number;
+  path: string;
+}
+export type PressAction = 'click' | 'focus' | 'accept';
+export interface PressParams {
+  path?: string | undefined;
+  text?: string | undefined;
+  action: PressAction;
+}
+export interface PressResult extends ControlInfo {
+  action: PressAction;
+  /** For buttons: whether `pressed` fired. */
+  pressed?: boolean;
 }
 
 export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=';
@@ -204,6 +274,10 @@ export interface RuntimeMethods {
   tree: { params: TreeParams; result: TreeResult };
   get_props: { params: GetPropsParams; result: GetPropsResult };
   set_props: { params: SetPropsParams; result: SetPropsResult };
+  pause: { params: PauseParams; result: ClockState };
+  step: { params: { frames: number }; result: StepResult };
+  controls: { params: ControlsParams; result: ControlsResult };
+  press: { params: PressParams; result: PressResult };
 }
 export type RuntimeMethod = keyof RuntimeMethods;
 

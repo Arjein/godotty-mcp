@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { GodotExecutable } from '../../src/godot/executable.js';
-import { GameManager, summarize } from '../../src/godot/game.js';
+import { GameManager, START_PAUSED_ARG, summarize } from '../../src/godot/game.js';
 import { RuntimeInjection, STATE_DIR } from '../../src/godot/runtime-injection.js';
 import { ToolError } from '../../src/util/errors.js';
 import { fakeGodot, type FakeGodotBehavior } from '../helpers/fake-godot.js';
@@ -72,6 +72,22 @@ describe('GameManager', () => {
     await expect
       .poll(() => game.output({ filter: 'all', limit: 10 }).lines.map((l) => l.text))
       .toContain('hello from game');
+    game.dispose();
+  });
+
+  it('passes the start-paused flag to the helper only when asked', async () => {
+    const { game, fake } = manager({
+      onGame: (_proc, events) => {
+        events.ready();
+      },
+    });
+    await game.start({ args: ['--level=2'], headless: true, paused: true });
+    const paused = fake.calls.filter((c) => !c.args.includes('--version')).at(-1)?.args ?? [];
+    expect(paused.slice(paused.indexOf('--'))).toContain(START_PAUSED_ARG);
+    expect(paused.at(-1)).toBe('--level=2');
+    await game.start({ args: [], headless: true });
+    const normal = fake.calls.filter((c) => !c.args.includes('--version')).at(-1)?.args ?? [];
+    expect(normal).not.toContain(START_PAUSED_ARG);
     game.dispose();
   });
 

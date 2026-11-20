@@ -46,6 +46,12 @@ export const runGame = defineTool({
       .default([])
       .describe('Extra user arguments for the game (OS.get_cmdline_user_args()).'),
     headless: z.boolean().default(false).describe('Run without a window or rendering.'),
+    paused: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Start frozen (after the main scene is ready, before its first frame); see pause_game / step_game.',
+      ),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (args, ctx) => {
@@ -73,12 +79,18 @@ export const runGame = defineTool({
       scene,
       args: args.args,
       headless: args.headless,
+      paused: args.paused,
     });
     const lines = [
       `${stoppedPrevious ? 'Stopped the previous run. ' : ''}Started ${describeRun(run)}.`,
       run.helperReady
         ? 'Runtime helper: ready (errors are captured with backtraces).'
         : 'Runtime helper: did NOT report ready; errors come from stderr only. Check get_output.',
+      ...(args.paused && run.helperReady
+        ? [
+            'Paused: step_game, send_input, wait or press_control advance it; pause_game paused=false resumes.',
+          ]
+        : []),
       'Next: get_output for logs, get_errors for errors, stop_game to end.',
     ];
     return textResult(lines.join('\n'));

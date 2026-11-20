@@ -80,6 +80,14 @@ describe('run_tests with GUT', () => {
     expect(named.text).toMatch(/^GUT PASSED — 1 test\(s\): 1 passed/);
   });
 
+  it('runs frame-counting tests unthrottled with fixed_fps', async () => {
+    const fast = await h.call('run_tests', {
+      path: 'res://test/unit/test_player.gd',
+      fixed_fps: 60,
+    });
+    expect(fast.text).toMatch(/^GUT PASSED — 3 test\(s\): 3 passed/);
+  });
+
   it('reports test scripts that fail to load instead of a silent pass', async () => {
     const { writeFileSync } = await import('node:fs');
     writeFileSync(

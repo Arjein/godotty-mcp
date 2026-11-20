@@ -117,6 +117,17 @@ describe('TestRunner', () => {
     expect(fake.calls.at(-1)?.args.some((a) => a.startsWith('-gdir'))).toBe(false);
   });
 
+  it('passes --fixed-fps before the framework script only when asked', async () => {
+    const { runner: r, fake } = runner();
+    await r.run(opts({ fixedFps: 60 }));
+    const args = fake.calls[2]?.args ?? [];
+    expect(args.indexOf('--fixed-fps')).toBeGreaterThan(-1);
+    expect(args[args.indexOf('--fixed-fps') + 1]).toBe('60');
+    expect(args.indexOf('--fixed-fps')).toBeLessThan(args.indexOf('-s'));
+    await r.run(opts({}));
+    expect(fake.calls.at(-1)?.args).not.toContain('--fixed-fps');
+  });
+
   it('runs gdUnit4 with --continue, finds the newest report and filters by name afterwards', async () => {
     const { runner: r, fake } = runner();
     const result = await r.run(

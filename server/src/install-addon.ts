@@ -36,7 +36,7 @@ export function installAddon(
     throw new ToolError(
       ErrorCode.InvalidInput,
       `${target} already exists.`,
-      'Pass --force to replace it with this version.',
+      'Pass --force (install_addon: force=true) to replace it with this version.',
     );
   }
   if (exists) rmSync(target, { recursive: true, force: true });

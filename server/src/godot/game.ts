@@ -22,6 +22,8 @@ export interface RunOptions {
   /** Passed to the game after `--` (read with OS.get_cmdline_user_args()). */
   args: readonly string[];
   headless: boolean;
+  /** Freeze the game before its first frame (the runtime helper pauses the SceneTree). */
+  paused?: boolean | undefined;
 }
 
 export type RunState = 'starting' | 'running' | 'exited';
@@ -65,6 +67,7 @@ const STARTUP_ERRORS_SHOWN = 3;
 export const EVENTS_ARG = '--godotty-events=';
 export const PORT_ARG = '--godotty-port=';
 export const ALLOW_EVAL_ARG = '--godotty-allow-eval';
+export const START_PAUSED_ARG = '--godotty-start-paused';
 /** Passed via the environment, not argv, so other local users can't read it from `ps`. */
 export const TOKEN_ENV = 'GODOTTY_BRIDGE_TOKEN';
 
@@ -201,6 +204,7 @@ export class GameManager {
       '--',
       `${EVENTS_ARG}${eventsFile}`,
       ...bridge.args,
+      ...(options.paused === true ? [START_PAUSED_ARG] : []),
       ...options.args,
     ];
     const child = this.options.godot.spawnGuarded(args, {

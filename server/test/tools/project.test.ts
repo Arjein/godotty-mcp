@@ -1,8 +1,9 @@
-import { writeFileSync } from 'node:fs';
+import { existsSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { sessionFilePath } from '../../src/bridge/session-file.js';
 import { copyDemoProject } from '../helpers/demo.js';
 import { fakeGodot } from '../helpers/fake-godot.js';
 import { fakeSpawner } from '../helpers/fake-process.js';
@@ -24,6 +25,67 @@ describe('project tools', () => {
     project.cleanup();
   });
 
+  describe('install_addon', () => {
+    it('copies the plugin into addons/ and refuses to overwrite without force', async () => {
+      const bare = makeTempProject();
+      const other = await connectTools(bare.root, fakeGodot().spawner);
+      try {
+        expect((await other.call('project_info')).text).toContain('install it with install_addon');
+        const first = await other.call('install_addon');
+        expect(first.text).toContain('Installed the Godotty editor plugin');
+        expect(first.text).toContain('Project Settings → Plugins');
+        expect(existsSync(path.join(bare.root, 'addons/godotty_mcp/plugin.cfg'))).toBe(true);
+        expect((await other.call('project_info')).text).toContain('installed but not enabled');
+        const again = await other.call('install_addon');
+        expect(again).toMatchObject({ isError: true });
+        expect(again.text).toContain('force=true');
+        expect((await other.call('install_addon', { force: true })).text).toContain('Replaced');
+      } finally {
+        await other.close();
+        bare.cleanup();
+      }
+    });
+
+    it('refuses an addons folder that links outside the project', async () => {
+      const bare = makeTempProject();
+      const outside = makeTempProject();
+      symlinkSync(outside.root, path.join(bare.root, 'addons'));
+      const other = await connectTools(bare.root, fakeGodot().spawner);
+      try {
+        expect((await other.call('install_addon')).text).toContain('PATH_OUTSIDE_PROJECT');
+        expect(existsSync(path.join(outside.root, 'godotty_mcp'))).toBe(false);
+      } finally {
+        await other.close();
+        bare.cleanup();
+        outside.cleanup();
+      }
+    });
+  });
+
+  describe('without project.godot', () => {
+    it('serves, reports NOT_FOUND for project tools, and picks the project up once it exists', async () => {
+      const bare = makeTempProject();
+      rmSync(path.join(bare.root, 'project.godot'));
+      const other = await connectTools(bare.root, fakeGodot().spawner);
+      try {
+        await other.services.start();
+        expect(existsSync(sessionFilePath(bare.root))).toBe(false);
+        const info = await other.call('project_info');
+        expect(info).toMatchObject({ isError: true });
+        expect(info.text).toContain('Error [NOT_FOUND]: No project.godot in');
+        expect(info.text).toContain('without a restart');
+        expect((await other.call('list_files')).text).toContain('No project.godot');
+        writeFileSync(path.join(bare.root, 'project.godot'), 'config_version=5\n');
+        expect((await other.call('project_info')).isError).toBe(false);
+        // The editor plugin finds the server once the project exists.
+        expect(existsSync(sessionFilePath(bare.root))).toBe(true);
+      } finally {
+        await other.close();
+        bare.cleanup();
+      }
+    });
+  });
+
   describe('project_info', () => {
     it('summarizes the project', async () => {
       const { text, isError } = await tools.call('project_info');
@@ -35,7 +97,10 @@ describe('project tools', () => {
       expect(text).toContain('Autoloads (0): none');
       expect(text).toContain('Input actions (5):\n  move_left: A (physical)');
       expect(text).toContain('Game: not running');
-      expect(text).toContain('Editor bridge: not connected');
+      expect(text).toContain(
+        'Editor bridge: not connected (the Godotty plugin is enabled; open this project in the Godot editor)',
+      );
+      expect(text).not.toContain('later version');
     });
 
     it('lists autoloads and plugins, and survives a missing Godot', async () => {
@@ -55,6 +120,7 @@ describe('project tools', () => {
       expect(text).toContain('none: no bindings');
       expect(text).toContain('Main scene: not set');
       expect(text).toContain('Renderer: default (forward_plus)');
+      expect(text).toContain('installed but not enabled');
       await other.close();
     });
 

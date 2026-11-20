@@ -1,3 +1,6 @@
+import { writeFileSync } from 'node:fs';
+import path from 'node:path';
+
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -179,5 +182,138 @@ describe('runtime tools without a rendering game', () => {
     expect(input.text).toMatch(/^Performed 1 step/);
     await h.call('stop_game');
     expect((await h.call('inspect_scene_tree')).text).toContain('No game is running');
+  });
+});
+
+const MENU_SCRIPT = `extends Control
+var presses: int = 0
+
+
+func _ready() -> void:
+	$Begin.pressed.connect(_on_begin)
+
+
+func _on_begin() -> void:
+	presses += 1
+	$Status.text = "pressed %d" % presses
+`;
+
+const MENU_SCENE = `[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui_menu.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2"]
+
+[node name="Menu" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 640.0
+offset_bottom = 360.0
+script = ExtResource("1")
+
+[node name="Begin" type="Button" parent="."]
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 240.0
+offset_bottom = 80.0
+text = "Begin the climb"
+
+[node name="Status" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 100.0
+offset_right = 240.0
+offset_bottom = 130.0
+text = "idle"
+
+[node name="Player" parent="." instance=ExtResource("2")]
+`;
+
+function playerY(text: string): number {
+  const match = /position:y: float = ([-\d.e]+)/.exec(text);
+  if (match === null) throw new Error(`no position:y in: ${text}`);
+  return Number(match[1]);
+}
+
+describe('pause, step and press UI controls (windowed)', () => {
+  let h: Harness;
+  const y = async (): Promise<number> =>
+    playerY(
+      (await h.call('get_node_properties', { node: 'Player', properties: ['position:y'] })).text,
+    );
+
+  beforeAll(async () => {
+    h = await startHarness();
+    writeFileSync(path.join(h.root, 'ui_menu.gd'), MENU_SCRIPT);
+    writeFileSync(path.join(h.root, 'ui_test.tscn'), MENU_SCENE);
+    const started = await h.call('run_game', { scene: 'res://ui_test.tscn', paused: true });
+    expect(started.text).toContain('Paused: step_game');
+  });
+
+  afterAll(async () => {
+    await h.close();
+  });
+
+  it('stays frozen between calls and steps exact frames', async () => {
+    // The player has no floor here, so it falls whenever physics runs.
+    const first = await y();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(await y()).toBe(first);
+    const stepped = await h.call('step_game', { frames: 30 });
+    expect(stepped.text).toMatch(
+      /^Stepped 30 physics frame\(s\) in \d+ ms; paused at physics frame \d+/,
+    );
+    const afterStep = await y();
+    expect(afterStep).toBeLessThan(first);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(await y()).toBe(afterStep);
+  });
+
+  it('observes values during an input batch, then freezes again', async () => {
+    const before = await y();
+    const { text } = await h.call('send_input', {
+      steps: [{ type: 'wait', ms: 200 }],
+      observe: [
+        { node: 'Player', property: 'position:y' },
+        { node: 'Status', property: 'text' },
+      ],
+    });
+    expect(text).toContain('Observed (');
+    expect(text).toContain('Status:text = "idle"');
+    expect(text.match(/Player:position:y = /g)?.length ?? 0).toBeGreaterThan(3);
+    const after = await y();
+    expect(after).toBeLessThan(before);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(await y()).toBe(after);
+  });
+
+  it('lists and presses controls by text, and reads getters', async () => {
+    const listed = await h.call('list_controls');
+    expect(listed.text).toContain(
+      '"Begin the climb"  Button  /root/Menu/Begin  at (40, 40) 200×40',
+    );
+    const clicked = await h.call('press_control', { text: 'begin the climb' });
+    expect(clicked.text).toMatch(/^Clicked "Begin the climb"/);
+    expect(clicked.text).not.toContain('Warning');
+    const accepted = await h.call('press_control', { node: 'Begin', action: 'accept' });
+    expect(accepted.text).not.toContain('Warning');
+    const props = await h.call('get_node_properties', {
+      node: '.',
+      properties: ['presses', 'is_visible_in_tree()'],
+    });
+    expect(props.text).toContain('presses: int = 2');
+    const status = await h.call('get_node_properties', { node: 'Status', properties: ['text'] });
+    expect(status.text).toContain('text: String = "pressed 2"');
+    expect(props.text).toContain('is_visible_in_tree(): bool = true');
+    const missing = await h.call('press_control', { text: 'Quit' });
+    expect(missing.text).toContain('No visible control with text');
+    expect(missing.text).toContain('"Begin the climb"');
+  });
+
+  it('resumes real time', async () => {
+    expect((await h.call('pause_game', { paused: false })).text).toMatch(
+      /^Game running in real time/,
+    );
+    const before = await y();
+    await h.call('wait', { frames: 20 });
+    expect(await y()).toBeLessThan(before);
   });
 });

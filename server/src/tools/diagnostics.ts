@@ -18,6 +18,12 @@ const MAX_ERRORS_LIMIT = 200;
 const BACKTRACE_FRAMES = 5;
 const GDSCRIPT_EXT = '.gd';
 const ADDONS_PREFIX = 'addons/';
+const MAX_EXCLUDED_CODES = 50;
+/** A warning code repeated this often in one file is shown as one grouped line. */
+const GROUP_MIN = 3;
+const GROUP_LINES_SHOWN = 12;
+/** Godot's language server prefixes warnings with their code: "(UNUSED_SIGNAL): …". */
+const WARNING_CODE = /^\(([A-Z_]+)\): /;
 
 export const checkScripts = defineTool({
   name: 'check_scripts',
@@ -34,6 +40,11 @@ export const checkScripts = defineTool({
       .boolean()
       .default(true)
       .describe('Include warnings (unused variables, unsafe casts, ...).'),
+    exclude_codes: z
+      .array(z.string().regex(/^[A-Za-z_]+$/))
+      .max(MAX_EXCLUDED_CODES)
+      .default([])
+      .describe('Warning codes to leave out, e.g. ["UNUSED_SIGNAL"] (shown in each warning).'),
     limit: z.number().int().min(1).max(MAX_DIAGNOSTICS_LIMIT).default(DEFAULT_DIAGNOSTICS_LIMIT),
   },
   // Not read-only: it may start a headless editor, which runs the project's @tool scripts and
@@ -43,11 +54,13 @@ export const checkScripts = defineTool({
     const files = scriptsAt(ctx, args.path);
     if (files.length === 0) return textResult(`No GDScript files found under ${args.path}.`);
     const result = await ctx.checker.check(files);
-    const diagnostics = result.diagnostics.filter(
-      (d) => args.include_warnings || d.severity === 'error',
-    );
+    const excluded = new Set(args.exclude_codes.map((c) => c.toUpperCase()));
+    const shown = result.diagnostics.filter((d) => args.include_warnings || d.severity === 'error');
+    const diagnostics = shown.filter((d) => !excluded.has(warningCode(d) ?? ''));
+    const text = formatDiagnostics(ctx, diagnostics, result.checked, result.source, args.limit);
+    const hidden = shown.length - diagnostics.length;
     return textResult(
-      formatDiagnostics(ctx, diagnostics, result.checked, result.source, args.limit),
+      hidden === 0 ? text : `${text}\n(${hidden} warning(s) excluded by exclude_codes.)`,
     );
   },
 });
@@ -96,15 +109,10 @@ function formatDiagnostics(
   );
   const page = paginate(sorted, { limit });
   const lines: string[] = [summary];
-  let currentFile = '';
-  for (const d of page.items) {
-    if (d.file !== currentFile) {
-      currentFile = d.file;
-      lines.push(ctx.sandbox.toResPath(d.file));
-    }
-    lines.push(
-      `  ${d.line}${d.column === undefined ? '' : `:${d.column}`} ${d.severity}: ${d.message}`,
-    );
+  const byFile = new Map<string, ScriptDiagnostic[]>();
+  for (const d of page.items) byFile.set(d.file, [...(byFile.get(d.file) ?? []), d]);
+  for (const [file, items] of byFile) {
+    lines.push(ctx.sandbox.toResPath(file), ...fileLines(items));
   }
   if (page.nextOffset !== undefined) {
     lines.push(
@@ -112,6 +120,39 @@ function formatDiagnostics(
     );
   }
   return lines.join('\n');
+}
+
+/** One line per diagnostic, except warning codes repeated GROUP_MIN+ times: one line each. */
+function fileLines(items: readonly ScriptDiagnostic[]): string[] {
+  const counts = new Map<string, number>();
+  for (const d of items) {
+    const code = warningCode(d);
+    if (code !== undefined) counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  const grouped = new Set<string>();
+  const lines: string[] = [];
+  for (const d of items) {
+    const code = warningCode(d);
+    if (code === undefined || (counts.get(code) ?? 0) < GROUP_MIN) {
+      lines.push(
+        `  ${d.line}${d.column === undefined ? '' : `:${d.column}`} ${d.severity}: ${d.message}`,
+      );
+      continue;
+    }
+    if (grouped.has(code)) continue;
+    grouped.add(code);
+    const same = items.filter((other) => warningCode(other) === code);
+    const at = same.slice(0, GROUP_LINES_SHOWN).map((other) => other.line);
+    const more = same.length > GROUP_LINES_SHOWN ? ', …' : '';
+    lines.push(
+      `  ${same.length}× ${d.severity} ${code} at lines ${at.join(', ')}${more}; first: ${d.message.replace(WARNING_CODE, '')}`,
+    );
+  }
+  return lines;
+}
+
+function warningCode(d: ScriptDiagnostic): string | undefined {
+  return d.severity === 'warning' ? WARNING_CODE.exec(d.message)?.[1] : undefined;
 }
 
 function severityRank(d: ScriptDiagnostic): number {

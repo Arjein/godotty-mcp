@@ -18,6 +18,7 @@ const MS_PER_SECOND = 1000;
 const MAX_FAILURES_SHOWN = 30;
 const MAX_MESSAGE_CHARS = 400;
 const MAX_TEST_NAME_CHARS = 200;
+const MAX_FIXED_FPS = 1000;
 const STATUS_MARK = { passed: '✓', failed: '✗', error: '✗', skipped: '-' } as const;
 
 export const runTests = defineTool({
@@ -45,6 +46,17 @@ export const runTests = defineTool({
       .optional()
       .describe('Only tests whose name contains this text.'),
     include_passed: z.boolean().default(false).describe('Also list passing tests.'),
+    fixed_fps: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_FIXED_FPS)
+      .optional()
+      .describe(
+        "Godot's --fixed-fps: simulate this many frames per second without waiting for real time, so " +
+          'tests that wait on frames or timers run as fast as the CPU allows (e.g. 60). Code that reads real ' +
+          'time (Time.get_ticks_msec) sees less of it.',
+      ),
     timeout_s: z.number().int().min(1).max(MAX_TIMEOUT_S).default(DEFAULT_TIMEOUT_S),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -55,6 +67,7 @@ export const runTests = defineTool({
       framework,
       target,
       testName: args.test_name,
+      fixedFps: args.fixed_fps,
       timeoutMs: args.timeout_s * MS_PER_SECOND,
     });
     return textResult(formatResult(result, args.include_passed));

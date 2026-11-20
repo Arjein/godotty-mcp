@@ -1,12 +1,15 @@
 @tool
 extends RefCounted
-## Runtime commands for the godotty-mcp bridge: screenshot, input, wait, tree, get/set properties.
+## Runtime commands for the godotty-mcp bridge: screenshot, input, wait, tree, get/set properties,
+## pause/step, and UI controls.
 ##
 ## Every command returns {"result": ...} or {"error": {"code", "message"}}; see
 ## server/src/bridge/protocol.ts for parameter and result shapes.
 
 const GodottyInput = preload("godotty_input.gd")
 const GodottyEval = preload("godotty_eval.gd")
+const GodottyClock = preload("godotty_clock.gd")
+const GodottyControls = preload("godotty_controls.gd")
 
 const MAX_VALUE_CHARS: int = 200
 const MAX_TEXT_CHARS: int = 40
@@ -15,6 +18,17 @@ const FLOAT_TOLERANCE: float = 0.0001
 const AUTOLOAD_NAME: String = "GodottyRuntime"
 const SKIPPED_USAGE: int = PROPERTY_USAGE_CATEGORY | PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP
 const LISTED_USAGE: int = PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_SCRIPT_VARIABLE
+## Positions in tree summaries are rounded to this step; smaller values print as 0.
+const SUMMARY_STEP: float = 0.001
+const SUMMARY_DECIMALS: int = 3
+## "name()" in a property list calls a zero-argument method whose name starts with one of these.
+const GETTER_PREFIXES: Array[String] = ["is_", "has_", "can_", "get_"]
+const GETTER_SUFFIX: String = "()"
+## Commands that play the game: while it is frozen they run it, then freeze it again.
+const ADVANCING_METHODS: Array[String] = ["input", "wait", "press"]
+const MAX_OBSERVED_CHANGES: int = 200
+const MIN_TIME_SCALE: float = 0.01
+const MAX_TIME_SCALE: float = 16.0
 
 ## Literals that make str_to_var load resources or build objects — loading a script can run its
 ## code, so these are refused unless eval is enabled.
@@ -24,12 +38,21 @@ const UNSAFE_LITERAL: String = "\\b(Object|Resource|ExtResource|SubResource)\\s*
 var eval_allowed: bool = false
 var _host: Node
 var _input: GodottyInput
+var _clock: GodottyClock
+var _controls: GodottyControls
 var _unsafe_literal: RegEx = RegEx.create_from_string(UNSAFE_LITERAL)
 
 
 func _init(host: Node) -> void:
 	_host = host
 	_input = GodottyInput.new(host)
+	_clock = GodottyClock.new(host)
+	_controls = GodottyControls.new(host)
+
+
+## Freezes the game before its first frame runs (run_game paused=true).
+func freeze() -> void:
+	_clock.freeze()
 
 
 ## Runs one request. Unknown methods and failures come back as {"error": ...}.
@@ -37,7 +60,12 @@ func run(method: String, params: Dictionary) -> Dictionary:
 	var handler: String = "_cmd_" + method
 	if not has_method(handler):
 		return _error("UNKNOWN_METHOD", "Unknown method '%s'." % method)
-	return await call(handler, params)
+	if not method in ADVANCING_METHODS:
+		return await call(handler, params)
+	_clock.begin()
+	var outcome: Dictionary = await call(handler, params)
+	_clock.end()
+	return outcome
 
 
 func _cmd_screenshot(params: Dictionary) -> Dictionary:
@@ -65,16 +93,76 @@ func _cmd_input(params: Dictionary) -> Dictionary:
 	var problem: String = _input.validate(steps)
 	if problem != "":
 		return _error(problem.get_slice("|", 0), problem.get_slice("|", 1))
+	var watch: Array = params.get("observe", [])
+	for entry: Variant in watch:
+		var bad: String = _watch_problem(entry)
+		if bad != "":
+			return _error("BAD_PARAMS", bad)
 	var start_ms: int = Time.get_ticks_msec()
 	var start_frame: int = Engine.get_process_frames()
-	for step: Dictionary in steps:
-		await _input.perform(step)
+	var record: Dictionary = {
+		"running": true, "step": 0, "start_ms": start_ms, "changes": [], "last": {}, "full": false
+	}
+	if not watch.is_empty():
+		_sample(watch, record)
+		_observe(watch, record)
+	for i: int in steps.size():
+		record["step"] = i + 1
+		await _input.perform(steps[i])
+	record["running"] = false
 	var elapsed: Dictionary = {
 		"steps": steps.size(),
 		"elapsed_ms": Time.get_ticks_msec() - start_ms,
 		"frames": Engine.get_process_frames() - start_frame,
 	}
+	if not watch.is_empty():
+		_sample(watch, record)
+		elapsed["observed"] = record["changes"]
+		elapsed["observed_truncated"] = record["full"]
 	return _ok(elapsed)
+
+
+## "" when an observe entry is {node, property} with a readable property, else why not.
+func _watch_problem(entry: Variant) -> String:
+	if not entry is Dictionary or str(entry.get("node", "")) == "":
+		return "Each observe entry needs a node and a property."
+	return _getter_syntax_problem(str(entry.get("property", "")))
+
+
+## Samples the watched values every frame until the batch ends (runs alongside the steps).
+func _observe(watch: Array, record: Dictionary) -> void:
+	while record["running"]:
+		await _host.get_tree().process_frame
+		if record["running"]:
+			_sample(watch, record)
+
+
+## Records each watched value that differs from the last one seen.
+func _sample(watch: Array, record: Dictionary) -> void:
+	var last: Dictionary = record["last"]
+	var changes: Array = record["changes"]
+	for entry: Dictionary in watch:
+		var node_path: String = str(entry["node"])
+		var property: String = str(entry.get("property", ""))
+		var key: String = "%s:%s" % [node_path, property]
+		var node: Node = _resolve(node_path)
+		var text: String = "<no node>"
+		if node != null:
+			var read: Array = _read(node, property)
+			text = _format(read[1]) if read[0] == "" else "<%s>" % read[0]
+		if last.has(key) and last[key] == text:
+			continue
+		last[key] = text
+		if changes.size() >= MAX_OBSERVED_CHANGES:
+			record["full"] = true
+			continue
+		var change: Dictionary = {
+			"t_ms": Time.get_ticks_msec() - int(record["start_ms"]),
+			"step": record["step"],
+			"name": key,
+			"value": text,
+		}
+		changes.append(change)
 
 
 func _cmd_wait(params: Dictionary) -> Dictionary:
@@ -83,6 +171,10 @@ func _cmd_wait(params: Dictionary) -> Dictionary:
 		var problem: String = _literal_problem(str(until["value"]))
 		if problem != "":
 			return _error("INVALID_VALUE", problem)
+	if until is Dictionary:
+		var syntax: String = _getter_syntax_problem(str(until.get("property", "")))
+		if syntax != "":
+			return _error("BAD_PARAMS", syntax)
 	var start_ms: int = Time.get_ticks_msec()
 	var start_frame: int = Engine.get_process_frames()
 	var outcome: Dictionary = {"met": true}
@@ -121,12 +213,102 @@ func _check(condition: Dictionary) -> Dictionary:
 	var property: String = str(condition.get("property", ""))
 	if node == null or property == "":
 		return {"met": node != null}
-	var current: Variant = node.get_indexed(NodePath(property))
+	var read: Array = _read(node, property)
+	if read[0] != "":
+		return {"met": false, "last_value": "<%s>" % read[0]}
+	var current: Variant = read[1]
 	var state: Dictionary = {"met": true, "last_value": _format(current)}
 	if condition.has("value"):
 		var expected: Variant = str_to_var(str(condition["value"]))
 		state["met"] = _compare(current, expected, str(condition.get("op", "==")))
 	return state
+
+
+func _cmd_pause(params: Dictionary) -> Dictionary:
+	if params.has("time_scale"):
+		Engine.time_scale = clampf(float(params["time_scale"]), MIN_TIME_SCALE, MAX_TIME_SCALE)
+	if bool(params.get("paused", true)):
+		_clock.freeze()
+	else:
+		_clock.resume()
+	return _ok(_clock_state())
+
+
+func _cmd_step(params: Dictionary) -> Dictionary:
+	var frames: int = maxi(1, int(params.get("frames", 1)))
+	var start_ms: int = Time.get_ticks_msec()
+	await _clock.step(frames)
+	return _ok(
+		_clock_state().merged({"frames": frames, "elapsed_ms": Time.get_ticks_msec() - start_ms})
+	)
+
+
+func _clock_state() -> Dictionary:
+	return {
+		"paused": _clock.is_frozen(),
+		"game_paused": _clock.is_game_paused(),
+		"time_scale": Engine.time_scale,
+		"physics_frame": Engine.get_physics_frames(),
+	}
+
+
+func _cmd_controls(params: Dictionary) -> Dictionary:
+	var path: String = str(params.get("path", ""))
+	var start: Node = _tree_start(path)
+	if start == null:
+		return _error("NODE_NOT_FOUND", "No node at '%s'." % path)
+	var found: Array[Control] = _controls.collect(start)
+	var listed: Array[Dictionary] = []
+	for control: Control in found.slice(0, int(params.get("max", 100))):
+		listed.append(_controls.describe(control, _display_path(control)))
+	return _ok({"controls": listed, "total": found.size(), "path": _display_path(start)})
+
+
+func _cmd_press(params: Dictionary) -> Dictionary:
+	var action: String = str(params.get("action", "click"))
+	var found: Dictionary = _find_control(params)
+	if found.has("error"):
+		return found
+	var control: Control = found["control"]
+	var problem: String = _controls.problem(control, action)
+	if problem != "":
+		return _error("CONTROL_UNAVAILABLE", problem)
+	# Describe first: pressing may free the control (a scene change).
+	var pressed: Dictionary = _controls.describe(control, _display_path(control))
+	pressed["action"] = action
+	return _ok(pressed.merged(await _controls.press(control, action)))
+
+
+## {"control": Control} for a press request by node path or visible text, else {"error": ...}.
+func _find_control(params: Dictionary) -> Dictionary:
+	var path: String = str(params.get("path", ""))
+	if path != "":
+		var node: Node = _resolve(path)
+		if not node is Control:
+			return _error("NODE_NOT_FOUND", "No Control at '%s'." % path)
+		return {"control": node}
+	var text: String = str(params.get("text", ""))
+	var matches: Array[Control] = _controls.find_by_text(_host.get_tree().root, text)
+	if matches.size() == 1:
+		return {"control": matches[0]}
+	if matches.is_empty():
+		var visible: PackedStringArray = []
+		for control: Control in _controls.collect(_host.get_tree().root).slice(0, 15):
+			if _controls.label(control) != "":
+				visible.append('"%s"' % _controls.label(control))
+		return _error(
+			"NODE_NOT_FOUND",
+			(
+				"No visible control with text '%s'. Visible: %s."
+				% [text, ", ".join(visible) if not visible.is_empty() else "none with text"]
+			)
+		)
+	var candidates: PackedStringArray = []
+	for control: Control in matches.slice(0, 10):
+		candidates.append('%s ("%s")' % [_display_path(control), _controls.label(control)])
+	return _error(
+		"AMBIGUOUS", "%d controls match '%s': %s." % [matches.size(), text, ", ".join(candidates)]
+	)
 
 
 func _cmd_tree(params: Dictionary) -> Dictionary:
@@ -197,11 +379,21 @@ func _position(node: Node) -> Variant:
 	return null
 
 
-## "Vector3(1, 2, 3)" → "(1, 2, 3)".
+## Vector3(1, 2.00049, -4.9e-07) → "(1, 2, 0)": rounded, so summaries stay short.
 func _compact(value: Variant) -> String:
-	var text: String = var_to_str(value)
-	var paren: int = text.find("(")
-	return text.substr(paren) if paren > 0 else text
+	var parts: PackedStringArray = []
+	var count: int = 2 if value is Vector2 else 3
+	for i: int in count:
+		parts.append(_short_number(float(value[i])))
+	return "(%s)" % ", ".join(parts)
+
+
+func _short_number(number: float) -> String:
+	var rounded: float = snappedf(number, SUMMARY_STEP)
+	if absf(rounded) < SUMMARY_STEP / 2.0:
+		rounded = 0.0
+	var text: String = String.num(rounded, SUMMARY_DECIMALS)
+	return text.trim_suffix(".0") if text.ends_with(".0") else text
 
 
 func _cmd_get_props(params: Dictionary) -> Dictionary:
@@ -218,11 +410,11 @@ func _cmd_get_props(params: Dictionary) -> Dictionary:
 		props = listed.slice(0, int(params.get("max", 80)))
 	else:
 		for name: Variant in names:
-			if not _has_property(node, str(name)):
-				return _error(
-					"PROPERTY_NOT_FOUND", "%s has no property '%s'." % [node.get_class(), name]
-				)
-			props.append(_prop_entry(node, str(name), _property_info(node, str(name))))
+			var read: Array = _read(node, str(name))
+			if read[0] != "":
+				return _error("PROPERTY_NOT_FOUND", read[0])
+			var info: Dictionary = {} if _is_getter(str(name)) else _property_info(node, str(name))
+			props.append(_value_entry(str(name), read[1], info))
 		total = props.size()
 	return _ok(_node_header(node).merged({"props": props, "total": total}))
 
@@ -317,6 +509,68 @@ func _eval_scene() -> Node:
 	return _host.get_tree().current_scene
 
 
+## [problem, value]: a property or sub-property ("position:x"), or a getter call ("is_open()",
+## "state_machine:current_name()"). problem is "" when the value could be read.
+func _read(node: Node, name: String) -> Array:
+	if not _is_getter(name):
+		if not _has_property(node, name):
+			return ["%s has no property '%s'." % [node.get_class(), name], null]
+		return ["", node.get_indexed(NodePath(name))]
+	var call_path: String = name.trim_suffix(GETTER_SUFFIX)
+	var colon: int = call_path.rfind(":")
+	var method: String = call_path.substr(colon + 1)
+	var target: Variant = node
+	if colon != -1:
+		var holder: String = call_path.left(colon)
+		if not _has_property(node, holder):
+			return ["%s has no property '%s'." % [node.get_class(), holder], null]
+		target = node.get_indexed(NodePath(holder))
+	var problem: String = _getter_problem(target, method)
+	if problem != "":
+		return [problem, null]
+	return ["", (target as Object).call(method)]
+
+
+func _is_getter(name: String) -> bool:
+	return name.ends_with(GETTER_SUFFIX)
+
+
+## "" unless `name` is a call that is not an allowed getter name.
+func _getter_syntax_problem(name: String) -> String:
+	if not _is_getter(name):
+		return ""
+	var method: String = name.trim_suffix(GETTER_SUFFIX).get_slice(":", name.count(":"))
+	for prefix: String in GETTER_PREFIXES:
+		if method.begins_with(prefix) and method.is_valid_identifier():
+			return ""
+	return (
+		"'%s' is not a getter: only zero-argument methods named is_*, has_*, can_* or get_* " % name
+		+ "can be called."
+	)
+
+
+func _getter_problem(target: Variant, method: String) -> String:
+	var syntax: String = _getter_syntax_problem(method + GETTER_SUFFIX)
+	if syntax != "":
+		return syntax
+	if typeof(target) != TYPE_OBJECT or not is_instance_valid(target):
+		return "%s() needs an object to call on, got %s." % [method, type_string(typeof(target))]
+	var object: Object = target
+	if not object.has_method(method):
+		return "%s has no method '%s'." % [object.get_class(), method]
+	if _required_arguments(object, method) != 0:
+		return "%s() takes arguments; only zero-argument getters can be called." % method
+	return ""
+
+
+## Arguments `method` needs (defaulted ones don't count); -1 when it is not listed.
+func _required_arguments(object: Object, method: String) -> int:
+	for info: Dictionary in object.get_method_list():
+		if info["name"] == method:
+			return (info["args"] as Array).size() - (info["default_args"] as Array).size()
+	return -1
+
+
 func _assignable(current: Variant, value: Variant) -> bool:
 	var current_type: int = typeof(current)
 	var value_type: int = typeof(value)
@@ -340,9 +594,12 @@ func _property_info(node: Node, name: String) -> Dictionary:
 
 
 func _prop_entry(node: Node, name: String, info: Dictionary) -> Dictionary:
-	var value: Variant = node.get_indexed(NodePath(name))
+	return _value_entry(name, node.get_indexed(NodePath(name)), info)
+
+
+func _value_entry(name: String, value: Variant, info: Dictionary) -> Dictionary:
 	var type_name: String = type_string(typeof(value))
-	if value is Object and value != null:
+	if typeof(value) == TYPE_OBJECT and is_instance_valid(value):
 		type_name = (value as Object).get_class()
 	var text: String = _format(value)
 	var label: String = _enum_label(info, value) if name == info.get("name", "") else ""
@@ -417,11 +674,30 @@ func _compare_numbers(a: float, b: float, op: String) -> bool:
 
 
 func _format(value: Variant) -> String:
-	if value is Resource and (value as Resource).resource_path != "":
-		return (value as Resource).resource_path
-	if value is Object:
-		return "<%s>" % (value as Object).get_class() if value != null else "null"
+	if typeof(value) == TYPE_OBJECT:
+		return _describe_object(value)
 	return _clip(var_to_str(value), MAX_VALUE_CHARS)
+
+
+## Resources with a file → their path; nodes → <Class /path script.gd>; others → <Class script.gd>.
+func _describe_object(value: Variant) -> String:
+	if value == null:
+		return "null"
+	if not is_instance_valid(value):
+		return "<freed object>"
+	var object: Object = value
+	if object is Resource and (object as Resource).resource_path != "":
+		return (object as Resource).resource_path
+	var parts: PackedStringArray = [object.get_class()]
+	if object is Node:
+		var node: Node = object
+		parts.append(
+			_display_path(node) if node.is_inside_tree() else "%s (not in tree)" % node.name
+		)
+	var script: Variant = object.get_script()
+	if script is Script and (script as Script).resource_path != "":
+		parts.append((script as Script).resource_path.get_file())
+	return "<%s>" % " ".join(parts)
 
 
 func _clip(text: String, limit: int) -> String:

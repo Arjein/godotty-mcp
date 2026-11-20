@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { PORT_ARG, TOKEN_ENV } from '../../src/godot/game.js';
+import { PORT_ARG, START_PAUSED_ARG, TOKEN_ENV } from '../../src/godot/game.js';
 import { fakeGodot } from '../helpers/fake-godot.js';
 import { FakeRuntime, type Handler } from '../helpers/fake-runtime.js';
 import { makeTempProject } from '../helpers/tmp-project.js';
@@ -12,7 +12,76 @@ const HANDLERS: Record<string, Handler> = {
   screenshot: (p) => ({
     result: { width: 640, height: 360, frames: Array.from({ length: Number(p.count) }, () => PNG) },
   }),
-  input: (p) => ({ result: { steps: (p.steps as unknown[]).length, elapsed_ms: 612, frames: 37 } }),
+  input: (p) => ({
+    result: {
+      steps: (p.steps as unknown[]).length,
+      elapsed_ms: 612,
+      frames: 37,
+      ...(p.observe === undefined
+        ? {}
+        : {
+            observed: [
+              { t_ms: 0, step: 0, name: 'HUD/Subtitle:text', value: '""' },
+              { t_ms: 350, step: 2, name: 'HUD/Subtitle:text', value: '"Two falls."' },
+            ],
+            observed_truncated: true,
+          }),
+    },
+  }),
+  pause: (p) => ({
+    result: {
+      paused: p.paused,
+      game_paused: false,
+      time_scale: p.time_scale ?? 1,
+      physics_frame: 120,
+    },
+  }),
+  step: (p) => ({
+    result: {
+      paused: true,
+      game_paused: true,
+      time_scale: 1,
+      physics_frame: 120 + Number(p.frames),
+      frames: p.frames,
+      elapsed_ms: 500,
+    },
+  }),
+  controls: () => ({
+    result: {
+      path: '/root',
+      total: 3,
+      controls: [
+        {
+          path: '/root/Menu/Begin',
+          class: 'Button',
+          text: 'Begin the climb',
+          rect: [520, 400, 240, 48],
+          focused: true,
+          disabled: false,
+        },
+        {
+          path: '/root/Menu/Icon',
+          class: 'TextureButton',
+          text: '',
+          rect: [10, 10, 32, 32],
+          focused: false,
+          disabled: true,
+        },
+      ],
+    },
+  }),
+  press: (p) => ({
+    result: {
+      path: '/root/Menu/Begin',
+      class: 'Button',
+      text: 'Begin the climb',
+      rect: [520, 400, 240, 48],
+      focused: false,
+      disabled: false,
+      action: p.action,
+      pressed: p.action !== 'click',
+    },
+  }),
   wait: (p) =>
     p.until === undefined
       ? { result: { met: true, elapsed_ms: 250, frames: 15 } }
@@ -71,6 +140,7 @@ describe('runtime tools', () => {
   let project: ReturnType<typeof makeTempProject>;
   let tools: ToolClient;
   let runtime: FakeRuntime;
+  let gameArgs: readonly string[] = [];
 
   beforeEach(async () => {
     project = makeTempProject({ 'scenes/a.tscn': '' });
@@ -79,6 +149,7 @@ describe('runtime tools', () => {
       project.root,
       fakeGodot({
         onGame: (_proc, events, call) => {
+          gameArgs = call.args;
           const port = Number(
             call.args.find((a) => a.startsWith(PORT_ARG))?.slice(PORT_ARG.length),
           );
@@ -98,6 +169,16 @@ describe('runtime tools', () => {
 
   it('requires a running game', async () => {
     expect((await tools.call('screenshot')).text).toContain('No game is running');
+    expect((await tools.call('pause_game')).text).toContain('No game is running');
+  });
+
+  it('starts the game paused on request', async () => {
+    const { text } = await tools.call('run_game', { paused: true });
+    expect(text).toContain('Paused: step_game');
+    expect(gameArgs).toContain(START_PAUSED_ARG);
+    const game = (await tools.call('run_game')).text;
+    expect(game).not.toContain('Paused:');
+    expect(gameArgs).not.toContain(START_PAUSED_ARG);
   });
 
   describe('with a running game', () => {
@@ -143,6 +224,61 @@ describe('runtime tools', () => {
       expect((await tools.call('send_input', { steps: [{ type: 'teleport' }] })).isError).toBe(
         true,
       );
+    });
+
+    it('reports values observed during an input batch', async () => {
+      const observe = [{ node: 'HUD/Subtitle', property: 'text' }];
+      const { text } = await tools.call('send_input', {
+        steps: [{ type: 'wait', ms: 100 }],
+        observe,
+      });
+      expect(text).toBe(
+        [
+          'Performed 1 step(s) in 612 ms (37 frames).',
+          'Observed (2 value(s), first = before step 1):',
+          '  +0 ms  step 0  HUD/Subtitle:text = ""',
+          '  +350 ms  step 2  HUD/Subtitle:text = "Two falls."',
+          '  … more changes not recorded; watch fewer values or use a shorter batch.',
+        ].join('\n'),
+      );
+      expect(runtime.requests.at(-1)?.params.observe).toEqual(observe);
+      await tools.call('send_input', { steps: [{ type: 'wait', ms: 1 }] });
+      expect(runtime.requests.at(-1)?.params).not.toHaveProperty('observe');
+    });
+
+    it('pauses, resumes and steps the game', async () => {
+      expect((await tools.call('pause_game')).text).toBe(
+        'Game paused at physics frame 120. send_input/wait/press_control advance it and pause again; step_game advances exact frames.',
+      );
+      expect(runtime.requests.at(-1)).toEqual({ method: 'pause', params: { paused: true } });
+      expect((await tools.call('pause_game', { paused: false, time_scale: 0.5 })).text).toBe(
+        'Game running in real time (physics frame 120, time_scale 0.5).',
+      );
+      expect((await tools.call('step_game', { frames: 30 })).text).toBe(
+        'Stepped 30 physics frame(s) in 500 ms; paused at physics frame 150; the game has also paused itself (its pause menu?).',
+      );
+      expect((await tools.call('step_game', { frames: 0 })).isError).toBe(true);
+    });
+
+    it('lists and presses UI controls', async () => {
+      expect((await tools.call('list_controls')).text).toBe(
+        [
+          '2 of 3 visible control(s) under /root:',
+          '"Begin the climb"  Button  /root/Menu/Begin  at (520, 400) 240×48  [focused]',
+          '(no text)  TextureButton  /root/Menu/Icon  at (10, 10) 32×32  [disabled]',
+          'More: raise max or pass a deeper node.',
+        ].join('\n'),
+      );
+      expect((await tools.call('press_control', { text: 'begin', action: 'accept' })).text).toBe(
+        'Accepted "Begin the climb"  Button  /root/Menu/Begin  at (520, 400) 240×48.',
+      );
+      expect(runtime.requests.at(-1)?.params).toEqual({ text: 'begin', action: 'accept' });
+      expect((await tools.call('press_control', { node: 'Menu/Begin' })).text).toContain(
+        'did not emit pressed',
+      );
+      const both = await tools.call('press_control', { node: 'Menu/Begin', text: 'Begin' });
+      expect(both.text).toContain('exactly one of text or node');
+      expect((await tools.call('press_control', {})).isError).toBe(true);
     });
 
     it('waits for frames, seconds or conditions', async () => {

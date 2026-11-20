@@ -2,8 +2,11 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
 import type {
+  ClockState,
+  ControlInfo,
   GetPropsParams,
   GetPropsResult,
+  InputResult,
   InputStep,
   TreeNode,
   TreeParams,
@@ -13,7 +16,8 @@ import { ErrorCode, ToolError } from '../util/errors.js';
 import { assertSafeLiterals } from '../util/literals.js';
 import { defineTool, textResult, type ToolContext } from './registry.js';
 
-const DEFAULT_MAX_SIZE = 960;
+/** Enough to read HUD text in most games; raise max_size for small text. */
+const DEFAULT_MAX_SIZE = 640;
 const MIN_MAX_SIZE = 64;
 const MAX_MAX_SIZE = 2048;
 const MAX_FRAMES = 8;
@@ -37,6 +41,22 @@ const MAX_LITERAL_CHARS = 10_000;
 const COMMAND_SLACK_MS = 15_000;
 /** Assumed duration of a tap/release step when estimating timeouts. */
 const STEP_ESTIMATE_MS = 100;
+const MAX_OBSERVED = 10;
+const MAX_STEP_FRAMES = 3600;
+const MIN_TIME_SCALE = 0.01;
+const MAX_TIME_SCALE = 16;
+const DEFAULT_CONTROLS = 50;
+const MAX_CONTROLS = 300;
+/** While frozen, these tools run the game for their duration and freeze it again. */
+const ADVANCES_WHEN_PAUSED =
+  'If the game is paused (pause_game), it runs while this call works and is paused again after.';
+
+const propertyName = z
+  .string()
+  .max(MAX_NAME_CHARS)
+  .describe(
+    'Property, sub-property ("position:x") or zero-argument getter ("is_open()", "state_machine:current_name()"; is_/has_/can_/get_ methods only).',
+  );
 
 const nodePath = z
   .string()
@@ -175,9 +195,18 @@ export const sendInput = defineTool({
     'mouse_motion, wait (ms or frames). mode: tap (default: press, release 2 physics frames later), press, ' +
     'release, or hold (press, wait duration_ms, default 500, release). Example: [{"type":"action",' +
     '"action":"move_right","mode":"hold","duration_ms":800},{"type":"action","action":"jump"}]. ' +
-    'screenshot_after returns an image of the result.',
+    'screenshot_after returns an image of the result. observe samples node properties every frame while ' +
+    'the steps run and returns each change with its time and step (catches text that appears and fades ' +
+    `mid-batch). ${ADVANCES_WHEN_PAUSED}`,
   inputSchema: {
     steps: z.array(stepSchema).min(1).max(MAX_STEPS),
+    observe: z
+      .array(z.object({ node: nodePath, property: propertyName }))
+      .max(MAX_OBSERVED)
+      .default([])
+      .describe(
+        'Values to watch during the batch, e.g. [{"node":"HUD/Subtitle","property":"text"}].',
+      ),
     screenshot_after: z
       .boolean()
       .default(false)
@@ -187,8 +216,16 @@ export const sendInput = defineTool({
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (args, ctx) => {
     const steps = args.steps as InputStep[];
-    const result = await ctx.runtime.call('input', { steps }, COMMAND_SLACK_MS + estimateMs(steps));
-    const text = `Performed ${result.steps} step(s) in ${result.elapsed_ms} ms (${result.frames} frames).`;
+    const observe = args.observe.length === 0 ? undefined : args.observe;
+    const result = await ctx.runtime.call(
+      'input',
+      { steps, observe },
+      COMMAND_SLACK_MS + estimateMs(steps),
+    );
+    const text = [
+      `Performed ${result.steps} step(s) in ${result.elapsed_ms} ms (${result.frames} frames).`,
+      ...observedLines(result),
+    ].join('\n');
     if (!args.screenshot_after) return textResult(text);
     const shot = await capture(ctx, args.max_size);
     return {
@@ -196,6 +233,16 @@ export const sendInput = defineTool({
     };
   },
 });
+
+function observedLines(result: InputResult): string[] {
+  const changes = result.observed;
+  if (changes === undefined) return [];
+  const lines = [`Observed (${changes.length} value(s), first = before step 1):`];
+  for (const c of changes) lines.push(`  +${c.t_ms} ms  step ${c.step}  ${c.name} = ${c.value}`);
+  if (result.observed_truncated === true)
+    lines.push('  … more changes not recorded; watch fewer values or use a shorter batch.');
+  return lines;
+}
 
 function estimateMs(steps: readonly InputStep[]): number {
   return steps.reduce((total, step) => {
@@ -211,18 +258,15 @@ export const wait = defineTool({
   description:
     'Waits inside the running game: a number of frames, a number of seconds, or until a condition holds ' +
     '(a node exists, or a node property compares to a value), then reports how long it took. Prefer a ' +
-    'condition over fixed sleeps, e.g. node="Player", property="position:y", op="<", value="0.6".',
+    'condition over fixed sleeps, e.g. node="Player", property="position:y", op="<", value="0.6", or ' +
+    `property="is_open()" value="true". ${ADVANCES_WHEN_PAUSED}`,
   inputSchema: {
     frames: z.number().int().min(1).max(MAX_DURATION_MS).optional(),
     seconds: z.number().min(0).max(MAX_TIMEOUT_S).optional(),
     node: nodePath
       .optional()
       .describe('Wait until this node exists (and, with property, until the condition holds).'),
-    property: z
-      .string()
-      .max(MAX_NAME_CHARS)
-      .optional()
-      .describe('Property or sub-property, e.g. "visible", "position:x".'),
+    property: propertyName.optional(),
     op: z.enum(['==', '!=', '<', '<=', '>', '>=']).default('=='),
     value: z
       .string()
@@ -332,13 +376,14 @@ export const getNodeProperties = defineTool({
   title: 'Get node properties',
   description:
     'Reads property values of a node in the running game (target=game) or in the scene open in the editor ' +
-    '(target=editor). Pass "properties" for specific ones (sub-properties ' +
-    'like "position:x" work), or list the inspector-visible and script properties, optionally filtered by ' +
-    'name. Values use Godot syntax (Vector3(1, 0, 2)).',
+    '(target=editor). Pass "properties" for specific ones (sub-properties like "position:x" and ' +
+    'zero-argument getters like "is_open()" work; getters run project code), or list the inspector-visible ' +
+    'and script properties, optionally filtered by name. Values use Godot syntax (Vector3(1, 0, 2)); nodes ' +
+    'show as <Class /path script.gd>.',
   inputSchema: {
     target: target,
     node: nodePath,
-    properties: z.array(z.string().max(MAX_NAME_CHARS)).max(MAX_PROPS).default([]),
+    properties: z.array(propertyName).max(MAX_PROPS).default([]),
     filter: z
       .string()
       .max(MAX_NAME_CHARS)
@@ -398,5 +443,157 @@ export const setNodeProperty = defineTool({
         ...result.props.map((p) => `${p.name} = ${p.value}`),
       ].join('\n'),
     );
+  },
+});
+
+function describeClock(state: ClockState): string {
+  const scale = state.time_scale === 1 ? '' : `, time_scale ${state.time_scale}`;
+  const own = state.game_paused ? '; the game has also paused itself (its pause menu?)' : '';
+  return `physics frame ${state.physics_frame}${scale}${own}`;
+}
+
+export const pauseGame = defineTool({
+  name: 'pause_game',
+  title: 'Pause or resume game',
+  description:
+    'Freezes the running game so nothing happens while you think (paused=true), or lets it run in real ' +
+    'time again (paused=false). While paused, send_input, wait and press_control run the game for their ' +
+    'own duration and pause it again, and step_game advances exact physics frames; screenshots and ' +
+    'property reads/writes work as usual. Pauses the SceneTree, so nodes with process_mode Always keep ' +
+    'running. time_scale sets Engine.time_scale (slow motion < 1). run_game paused=true starts paused.',
+  inputSchema: {
+    paused: z.boolean().default(true),
+    time_scale: z.number().min(MIN_TIME_SCALE).max(MAX_TIME_SCALE).optional(),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async (args, ctx) => {
+    const state = await ctx.runtime.call(
+      'pause',
+      { paused: args.paused, time_scale: args.time_scale },
+      COMMAND_SLACK_MS,
+    );
+    return textResult(
+      state.paused
+        ? `Game paused at ${describeClock(state)}. send_input/wait/press_control advance it and pause again; step_game advances exact frames.`
+        : `Game running in real time (${describeClock(state)}).`,
+    );
+  },
+});
+
+export const stepGame = defineTool({
+  name: 'step_game',
+  title: 'Step game',
+  description:
+    'Runs the game for exactly N physics frames (60 = one second at the default tick rate), then leaves ' +
+    'it paused. Works whether or not the game was paused. Use it to let a jump, attack or animation play ' +
+    'out deterministically between checks.',
+  inputSchema: {
+    frames: z.number().int().min(1).max(MAX_STEP_FRAMES).default(1),
+    screenshot_after: z.boolean().default(false).describe('Return a screenshot after stepping.'),
+    max_size: z.number().int().min(MIN_MAX_SIZE).max(MAX_MAX_SIZE).default(DEFAULT_MAX_SIZE),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async (args, ctx) => {
+    const result = await ctx.runtime.call(
+      'step',
+      { frames: args.frames },
+      COMMAND_SLACK_MS + args.frames * STEP_ESTIMATE_MS,
+    );
+    const text = `Stepped ${result.frames} physics frame(s) in ${result.elapsed_ms} ms; paused at ${describeClock(result)}.`;
+    if (!args.screenshot_after) return textResult(text);
+    const shot = await capture(ctx, args.max_size);
+    return {
+      content: [{ type: 'text', text: `${text}\n${shot.text}` }, ...shot.images.map(image)],
+    };
+  },
+});
+
+function describeControl(c: ControlInfo): string {
+  const [x, y, w, h] = c.rect;
+  const flags = [c.focused ? 'focused' : '', c.disabled ? 'disabled' : ''].filter((f) => f !== '');
+  const text = c.text === '' ? '(no text)' : JSON.stringify(c.text);
+  return `${text}  ${c.class}  ${c.path}  at (${x}, ${y}) ${w}×${h}${flags.length > 0 ? `  [${flags.join(', ')}]` : ''}`;
+}
+
+export const listControls = defineTool({
+  name: 'list_controls',
+  title: 'List UI controls',
+  description:
+    'Lists the visible interactive UI controls in the running game (buttons, and anything that takes ' +
+    'focus: sliders, text fields, …) with their text, node path, rect in viewport pixels, and focused / ' +
+    'disabled state, in tree order. Use it before press_control to see what a menu offers.',
+  inputSchema: {
+    node: nodePath.default('').describe('Only controls under this node; "" = the whole game.'),
+    max: z.number().int().min(1).max(MAX_CONTROLS).default(DEFAULT_CONTROLS),
+  },
+  annotations: { readOnlyHint: true, openWorldHint: false },
+  handler: async (args, ctx) => {
+    const result = await ctx.runtime.call(
+      'controls',
+      { path: args.node, max: args.max },
+      COMMAND_SLACK_MS,
+    );
+    if (result.total === 0)
+      return textResult(`No visible interactive controls under ${result.path}.`);
+    const shown =
+      result.controls.length < result.total
+        ? `${result.controls.length} of ${result.total}`
+        : `${result.total}`;
+    const lines = [
+      `${shown} visible control(s) under ${result.path}:`,
+      ...result.controls.map(describeControl),
+    ];
+    if (result.controls.length < result.total) lines.push('More: raise max or pass a deeper node.');
+    return textResult(lines.join('\n'));
+  },
+});
+
+export const pressControl = defineTool({
+  name: 'press_control',
+  title: 'Press UI control',
+  description:
+    'Presses a UI control in the running game, found by its visible text (case-insensitive; exact match ' +
+    'first, then substring) or by node path. action: click (default; a left click at its centre through ' +
+    'the GUI input path), focus (grab_focus only), or accept (focus, then tap ui_accept like a keyboard or ' +
+    'gamepad). Reports whether a button actually emitted pressed. Safer than navigating menus key by key ' +
+    `or guessing pixel coordinates. ${ADVANCES_WHEN_PAUSED}`,
+  inputSchema: {
+    text: z
+      .string()
+      .max(MAX_NAME_CHARS)
+      .optional()
+      .describe('Visible text, e.g. "Begin the climb".'),
+    node: nodePath.optional(),
+    action: z.enum(['click', 'focus', 'accept']).default('click'),
+    screenshot_after: z.boolean().default(false),
+    max_size: z.number().int().min(MIN_MAX_SIZE).max(MAX_MAX_SIZE).default(DEFAULT_MAX_SIZE),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async (args, ctx) => {
+    if ((args.text === undefined) === (args.node === undefined)) {
+      throw new ToolError(
+        ErrorCode.InvalidInput,
+        'Pass exactly one of text or node.',
+        'list_controls shows the texts and paths of visible controls.',
+      );
+    }
+    const result = await ctx.runtime.call(
+      'press',
+      { path: args.node, text: args.text, action: args.action },
+      COMMAND_SLACK_MS,
+    );
+    const verb = { click: 'Clicked', focus: 'Focused', accept: 'Accepted' }[result.action];
+    const lines = [`${verb} ${describeControl(result)}.`];
+    if (result.pressed === false && result.action !== 'focus')
+      lines.push(
+        'Warning: the button did not emit pressed (covered by another control, or the game ignores this input?). ' +
+          (result.action === 'click' ? 'Try action="accept".' : 'Try action="click".'),
+      );
+    const text = lines.join('\n');
+    if (!args.screenshot_after) return textResult(text);
+    const shot = await capture(ctx, args.max_size);
+    return {
+      content: [{ type: 'text', text: `${text}\n${shot.text}` }, ...shot.images.map(image)],
+    };
   },
 });

@@ -20,6 +20,8 @@ export interface TestRunOptions {
   target: string | undefined;
   /** Only tests whose name contains this text. */
   testName: string | undefined;
+  /** Godot's --fixed-fps: N frames per simulated second, without real-time sync. */
+  fixedFps?: number | undefined;
   timeoutMs: number;
 }
 
@@ -108,6 +110,7 @@ export class TestRunner {
       '--headless',
       '--path',
       this.projectRoot,
+      ...(options.fixedFps === undefined ? [] : ['--fixed-fps', String(options.fixedFps)]),
       '-s',
       `${RES_PREFIX}${FRAMEWORKS[options.framework].entry}`,
     ];

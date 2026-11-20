@@ -35,6 +35,14 @@ const REMOTE_HINTS: Readonly<Record<string, { code: ErrorCode; hint: string }>> 
     code: ErrorCode.InvalidInput,
     hint: 'Fix the GDScript; the code is the body of a function, so use return to send back a value.',
   },
+  [RemoteErrorCode.Ambiguous]: {
+    code: ErrorCode.InvalidInput,
+    hint: 'Pass node with one of the listed paths instead of text (list_controls shows them all).',
+  },
+  [RemoteErrorCode.ControlUnavailable]: {
+    code: ErrorCode.InvalidInput,
+    hint: 'list_controls shows which controls are visible and enabled; wait for the menu to appear.',
+  },
   [EditorErrorCode.NoScene]: { code: ErrorCode.InvalidInput, hint: 'Open one with open_scene.' },
   [EditorErrorCode.InvalidType]: {
     code: ErrorCode.InvalidInput,

@@ -162,6 +162,54 @@ describe('run and diagnostics tools', () => {
       );
     });
 
+    it('groups repeated warning codes per file and excludes codes on request', async () => {
+      const signal = (
+        line: number,
+        name: string,
+      ): { line: number; character: number; severity: number; message: string } => ({
+        line,
+        character: 7,
+        severity: 2,
+        message: `(UNUSED_SIGNAL): The signal "${name}" is declared but never explicitly used in the class.`,
+      });
+      const noisy = new FakeLsp({
+        workspace: project.root,
+        diagnostics: (file) =>
+          file.endsWith('a.gd')
+            ? [
+                signal(9, 'a'),
+                signal(12, 'b'),
+                signal(15, 'c'),
+                { line: 20, character: 1, severity: 2, message: '(UNUSED_VARIABLE): x unused' },
+              ]
+            : [],
+      });
+      const tools = await connectTools(project.root, fakeGodot().spawner, {
+        editorLspPort: await noisy.listen(),
+      });
+      try {
+        expect((await tools.call('check_scripts')).text).toBe(
+          [
+            '0 error(s), 4 warning(s) in 1 of 2 script(s) (checked with editor-lsp).',
+            'res://scripts/a.gd',
+            '  3× warning UNUSED_SIGNAL at lines 10, 13, 16; first: The signal "a" is declared but never explicitly used in the class.',
+            '  21:2 warning: (UNUSED_VARIABLE): x unused',
+          ].join('\n'),
+        );
+        expect((await tools.call('check_scripts', { exclude_codes: ['unused_signal'] })).text).toBe(
+          [
+            '0 error(s), 1 warning(s) in 1 of 2 script(s) (checked with editor-lsp).',
+            'res://scripts/a.gd',
+            '  21:2 warning: (UNUSED_VARIABLE): x unused',
+            '(3 warning(s) excluded by exclude_codes.)',
+          ].join('\n'),
+        );
+      } finally {
+        await tools.close();
+        await noisy.close();
+      }
+    });
+
     it('validates the path', async () => {
       expect((await checked.call('check_scripts', { path: 'res://notes.txt' })).text).toContain(
         'not a GDScript file',
