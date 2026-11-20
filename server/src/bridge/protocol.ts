@@ -186,3 +186,83 @@ export interface RuntimeMethods {
   set_props: { params: SetPropsParams; result: SetPropsResult };
 }
 export type RuntimeMethod = keyof RuntimeMethods;
+
+// ---------------------------------------------------------------------------------------------
+// Editor methods (editor plugin). Node paths are relative to the edited scene root ("." = root).
+
+export interface SceneInfo {
+  /** res:// path of the edited scene ("" if never saved). */
+  scene: string;
+  root: string;
+  class: string;
+  nodes: number;
+  /** True when the scene has unsaved changes. */
+  unsaved: boolean;
+}
+
+export interface OpenSceneParams {
+  path: string;
+  /** When set, create a new scene with a root of this class (the file must not exist). */
+  create_root_type?: string | undefined;
+  root_name?: string | undefined;
+}
+
+export interface AddNodeParams {
+  parent: string;
+  name: string;
+  /** Class to instantiate, e.g. "Sprite2D"; or `scene` to instance a .tscn. */
+  type?: string | undefined;
+  scene?: string | undefined;
+  properties: Record<string, string>;
+}
+
+export interface UpdateNodeParams {
+  node: string;
+  properties: Record<string, string>;
+  rename?: string | undefined;
+  reparent?: string | undefined;
+  /** res:// script to attach, or "" to detach. */
+  script?: string | undefined;
+}
+
+export interface EditResult extends SceneInfo {
+  /** Path of the affected node after the edit (relative to the scene root). */
+  node: string;
+  /** The undo-history entry name. */
+  action: string;
+  changes: string[];
+}
+
+export interface EditorMethods {
+  open_scene: { params: OpenSceneParams; result: SceneInfo };
+  add_node: { params: AddNodeParams; result: EditResult };
+  remove_node: { params: { node: string }; result: EditResult };
+  update_node: { params: UpdateNodeParams; result: EditResult };
+  save_scene: { params: { path?: string | undefined }; result: SceneInfo };
+  tree: { params: TreeParams; result: TreeResult };
+  get_props: { params: GetPropsParams; result: GetPropsResult };
+  /** Test/maintenance hooks: step the edited scene's undo history. */
+  undo: { params: Record<string, never>; result: SceneInfo & { action: string } };
+  redo: { params: Record<string, never>; result: SceneInfo & { action: string } };
+}
+export type EditorMethod = keyof EditorMethods;
+
+/** Extra remote error codes from the editor plugin. */
+export const EditorErrorCode = {
+  NoScene: 'NO_SCENE',
+  InvalidType: 'INVALID_TYPE',
+  InvalidName: 'INVALID_NAME',
+  InvalidOperation: 'INVALID_OPERATION',
+  FileExists: 'FILE_EXISTS',
+  FileNotFound: 'FILE_NOT_FOUND',
+  SaveFailed: 'SAVE_FAILED',
+} as const;
+
+/** Written by the server so the editor plugin can find it; see session-file.ts. */
+export interface SessionFile {
+  port: number;
+  token: string;
+  protocol: number;
+  pid: number;
+  server: string;
+}

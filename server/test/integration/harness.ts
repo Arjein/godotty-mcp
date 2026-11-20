@@ -50,6 +50,7 @@ export async function startHarness(extraFiles: Record<string, string> = {}): Pro
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'integration', version: '0.0.0' });
+  await server.services.start();
   await Promise.all([server.server.connect(serverSide), client.connect(clientSide)]);
   return {
     root,

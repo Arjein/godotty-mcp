@@ -34,6 +34,11 @@ export interface ScriptCheckerOptions {
   projectRoot: string;
   /** Port the Godot editor's language server listens on (editor setting, default 6005). */
   editorLspPort: number;
+  /**
+   * True when the Godot editor has this project open (its plugin is connected). Then a second,
+   * headless editor is never started on the same project: both would write .godot/ caches.
+   */
+  editorOpen?: () => boolean;
   timeouts?: Partial<CheckerTimeouts>;
 }
 
@@ -132,6 +137,11 @@ export class ScriptChecker {
     if (editor !== undefined) return editor;
     if (this.headless !== undefined && !this.headless.session.connection.isClosed) {
       return this.headless.session;
+    }
+    if (this.options.editorOpen?.() === true) {
+      throw new Error(
+        'The editor is open but its language server is unreachable; not starting a second editor',
+      );
     }
     return this.startHeadless();
   }

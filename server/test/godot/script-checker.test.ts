@@ -134,6 +134,20 @@ describe('ScriptChecker', () => {
     expect(editor?.signals).toContain('SIGTERM');
   });
 
+  it('never starts a second editor while the real one is open (regression: concurrent .godot writes)', async () => {
+    const fake = fakeGodot({ onEditor: () => undefined, onCheckOnly: () => '' });
+    const instance = new ScriptChecker({
+      godot: new GodotExecutable('godot', fake.spawner),
+      projectRoot: project.root,
+      editorLspPort: await findFreePort(),
+      editorOpen: () => true,
+      timeouts: FAST,
+    });
+    checkers.push(instance);
+    expect((await instance.check([a])).source).toBe('check-only');
+    expect(fake.calls.some((c) => c.args.includes('--lsp-port'))).toBe(false);
+  });
+
   it('ignores an editor that does not announce its workspace', async () => {
     const editorPort = await lsp({ diagnostics: diagnosticsFor });
     const { checker: c } = checker(editorPort, {

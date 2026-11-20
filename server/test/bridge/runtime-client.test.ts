@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BridgeServer } from '../../src/bridge/bridge-server.js';
-import { RuntimeClient } from '../../src/bridge/runtime-client.js';
+import {
+  editorClient,
+  runtimeClient,
+  type RuntimeClient,
+} from '../../src/bridge/runtime-client.js';
 import type { GameManager } from '../../src/godot/game.js';
 import { FakeRuntime } from '../helpers/fake-runtime.js';
 
@@ -14,7 +18,7 @@ describe('RuntimeClient', () => {
   beforeEach(async () => {
     bridge = new BridgeServer();
     running = true;
-    client = new RuntimeClient(bridge, {
+    client = runtimeClient(bridge, {
       get isRunning() {
         return running;
       },
@@ -58,11 +62,26 @@ describe('RuntimeClient', () => {
     running = true;
     peer.close();
     await expect.poll(() => bridge.peer('runtime')).toBeUndefined();
-    const quick = new RuntimeClient(bridge, { isRunning: true } as unknown as GameManager);
+    const quick = runtimeClient(bridge, { isRunning: true } as unknown as GameManager);
     const started = Date.now();
     await expect(quick.call('tree', { path: '', depth: 1, max_nodes: 1 }, 1000)).rejects.toThrow(
       /runtime helper is not connected/,
     );
     expect(Date.now() - started).toBeGreaterThanOrEqual(4000);
   }, 10_000);
+});
+
+describe('editorClient', () => {
+  it('explains how to connect the editor when its plugin is absent', async () => {
+    const bridge = new BridgeServer();
+    const client = editorClient(bridge);
+    expect(client.isConnected).toBe(false);
+    await expect(
+      client.call('tree', { path: '', depth: 1, max_nodes: 1 }, 1000),
+    ).rejects.toMatchObject({
+      code: 'EDITOR_NOT_CONNECTED',
+      hint: expect.stringContaining('Project Settings → Plugins') as string,
+    });
+    bridge.close();
+  });
 });

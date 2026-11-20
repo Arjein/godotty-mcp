@@ -32,6 +32,12 @@ export type Spawner = (
 ) => ChildProcess;
 
 export const MIN_GODOT = { major: 4, minor: 5 } as const;
+/**
+ * Set on every Godot process the server starts (headless LSP editor, --import, --doctool, tests,
+ * games). The Godotty editor plugin stays offline when it sees it, so only the user's own editor
+ * ever connects as "the editor".
+ */
+export const NO_EDITOR_BRIDGE_ENV = 'GODOTTY_NO_EDITOR_BRIDGE';
 const VERSION_TIMEOUT_MS = 15_000;
 const KILL_GRACE_MS = 2_000;
 const VERSION_PATTERN = /^(?<major>\d+)\.(?<minor>\d+)(?:\.(?<patch>\d+))?\.(?<status>[a-z0-9_]+)/i;
@@ -77,7 +83,8 @@ export class GodotExecutable {
 
   /** Starts Godot with `args`; the caller owns the process. */
   public spawn(args: readonly string[], options: SpawnOptions = {}): ChildProcess {
-    return this.spawner(this.path, args, { stdio: ['ignore', 'pipe', 'pipe'], ...options });
+    const env = { ...process.env, ...options.env, [NO_EDITOR_BRIDGE_ENV]: '1' };
+    return this.spawner(this.path, args, { stdio: ['ignore', 'pipe', 'pipe'], ...options, env });
   }
 
   /** Runs Godot to completion, collecting output; kills it after `timeoutMs`. */

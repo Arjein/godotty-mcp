@@ -2,7 +2,8 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 
 import { BridgeServer } from './bridge/bridge-server.js';
-import { RuntimeClient } from './bridge/runtime-client.js';
+import { editorClient, runtimeClient } from './bridge/runtime-client.js';
+import { removeSessionFile, writeSessionFile } from './bridge/session-file.js';
 import type { ServerConfig } from './config.js';
 import { DocsStore, httpFetchText, type TextFetcher } from './godot/docs/docs-store.js';
 import { GodotExecutable, type Spawner } from './godot/executable.js';
@@ -12,8 +13,12 @@ import { DEFAULT_EDITOR_LSP_PORT, ScriptChecker } from './godot/script-checker.j
 import { TestRunner } from './godot/tests/test-runner.js';
 import type { ToolContext } from './tools/registry.js';
 import { ProjectSandbox } from './util/sandbox.js';
+import { SERVER_VERSION } from './version.js';
 
 export interface Services extends ToolContext {
+  bridge: BridgeServer;
+  /** Starts the bridge and publishes the session file for the editor plugin. */
+  start: () => Promise<void>;
   /** Stops child processes and restores the project; call on shutdown. */
   dispose: () => void;
 }
@@ -44,6 +49,7 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
     godot,
     projectRoot: sandbox.root,
     editorLspPort: config.editorLspPort ?? DEFAULT_EDITOR_LSP_PORT,
+    editorOpen: () => bridge.peer('editor') !== undefined,
   });
   const docs = new DocsStore({
     godot,
@@ -59,8 +65,14 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
     checker,
     docs,
     tests: new TestRunner(godot, sandbox.root),
-    runtime: new RuntimeClient(bridge, game),
+    runtime: runtimeClient(bridge, game),
+    editor: editorClient(bridge),
+    bridge,
+    start: async () => {
+      writeSessionFile(sandbox.root, await bridge.listen(), bridge.token, SERVER_VERSION);
+    },
     dispose: () => {
+      removeSessionFile(sandbox.root);
       game.dispose();
       checker.dispose();
       bridge.close();

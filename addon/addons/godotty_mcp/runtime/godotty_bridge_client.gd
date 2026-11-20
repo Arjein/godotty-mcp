@@ -1,3 +1,4 @@
+@tool
 extends Node
 ## TCP client side of the godotty-mcp bridge (see server/src/bridge/protocol.ts).
 ##
@@ -9,22 +10,29 @@ extends Node
 const PROTOCOL_VERSION: int = 1
 const HOST: String = "127.0.0.1"
 const NEWLINE: int = 10
-const ROLE: String = "runtime"
 
 var _tcp: StreamPeerTCP = StreamPeerTCP.new()
 var _buffer: PackedByteArray = PackedByteArray()
 var _port: int
 var _token: String
 var _commands: RefCounted
+var _role: String = "runtime"
 var _hello_sent: bool = false
 var _finished: bool = false
 
 
 ## Prepares the connection; it is opened when the node enters the tree.
-func setup(port: int, token: String, commands: RefCounted) -> void:
+## `role` is "runtime" (game) or "editor" (editor plugin).
+func setup(port: int, token: String, commands: RefCounted, role: String = "runtime") -> void:
 	_port = port
 	_token = token
 	_commands = commands
+	_role = role
+
+
+## True once the server is gone or rejected us; the owner may reconnect with a new client.
+func is_finished() -> bool:
+	return _finished
 
 
 func _ready() -> void:
@@ -53,7 +61,7 @@ func _send_hello() -> void:
 	_hello_sent = true
 	var hello: Dictionary = {
 		"type": "hello",
-		"role": ROLE,
+		"role": _role,
 		"protocol": PROTOCOL_VERSION,
 		"token": _token,
 		"godot": Engine.get_version_info().get("string", ""),

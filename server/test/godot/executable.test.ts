@@ -4,6 +4,7 @@ import {
   formatVersion,
   GodotExecutable,
   killGracefully,
+  NO_EDITOR_BRIDGE_ENV,
   parseGodotVersion,
 } from '../../src/godot/executable.js';
 import { ToolError } from '../../src/util/errors.js';
@@ -78,6 +79,12 @@ describe('GodotExecutable', () => {
     await expect(
       new GodotExecutable('g', fake.spawner).exec([], { timeoutMs: 1000 }),
     ).rejects.toThrow('EACCES');
+  });
+
+  it('marks every spawned process so the editor plugin stays offline in it', () => {
+    const fake = fakeSpawner(() => undefined);
+    new GodotExecutable('g', fake.spawner).spawn(['--editor'], { env: { EXTRA: '1' } });
+    expect(fake.calls[0]?.env).toMatchObject({ EXTRA: '1', [NO_EDITOR_BRIDGE_ENV]: '1' });
   });
 
   it('collects stdout/stderr and passes cwd', async () => {

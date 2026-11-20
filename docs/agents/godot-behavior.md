@@ -62,6 +62,8 @@ script_backtraces: Array[ScriptBacktrace])`, `_log_message(message, error)`;
   the first failing test** and omits the rest (suite `tests` attribute still counts them). Exit
   100 on failures. Runtime errors → `<error type="ABORT">`; messages contain `res://file.gd:line`.
   No CLI filter by test name (only `-i` ignore lists).
+- GUT 9.5 fails a test on any `push_warning()` raised during it (9.7 does not); route intended
+  warnings through an overridable method so tests can capture them.
 - A test script with a parse error is silently skipped by both; the only trace is a
   `SCRIPT ERROR: Parse Error:` block in the run output.
 
@@ -79,3 +81,19 @@ RenderingServer.frame_post_draw`. **Headless never emits `frame_post_draw` — a
   in GDScript, not `false`; check types first.
 - `JSON.parse_string()` logs an engine error on malformed input; `JSON.new().parse()` does not.
 - `.tscn` writes `Transform3D(...)` basis values **row by row** (xx, xy, xz, yx, …), then origin.
+
+## Editor plugin (headless editor works too)
+
+- `godot --headless --editor --path <p>` loads enabled editor plugins; `EditorInterface`
+  (`open_scene_from_path`, `get_edited_scene_root`, `save_scene`, `save_scene_as`) and
+  `EditorUndoRedoManager` all work headless, so editor edits are integration-testable on CI.
+- `create_action(name, MERGE_DISABLE, scene_root)` puts the action in that scene's history; get it
+  with `get_history_undo_redo(get_object_history_id(root))`. After `undo()` the "current action"
+  is the previous entry — read the name **before** undoing (after redoing).
+- Headless `save_scene()` logs `Parameter "t" is null` from the dummy renderer's thumbnail step;
+  harmless. `save_scene_as(path, false)` skips the preview.
+- Godot 4.7 writes `unique_id=<n>` into `[node ...]` headers of saved scenes (4.5 doesn't).
+- In the editor, nodes inside instanced scenes are real children of the instance root, so live
+  node counts are higher than the `.tscn`'s `[node]` count.
+- `.tscn`-saving needs owners: nodes added by script must `set_owner(scene_root)` (instance roots
+  only; their children stay owned by the instance) or they are not saved.

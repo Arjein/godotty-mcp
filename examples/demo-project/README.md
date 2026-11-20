@@ -3,6 +3,9 @@
 A small Godot 4 3D scene (floor, light, camera, and a `CharacterBody3D` player driven by the
 `move_*` and `jump` input actions) used for demos and godotty-mcp's integration tests.
 
+The Godotty editor plugin is enabled; `addons/godotty_mcp` is a symlink to the repository's
+`addon/addons/godotty_mcp` (on Windows, enable symlinks in git or copy that folder instead).
+
 The GUT tests in `test/unit/` need GUT, which is not committed. Install the pinned version that
 matches your Godot with:
 

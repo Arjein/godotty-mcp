@@ -43,6 +43,12 @@ Known problems: `FLAGS.md`.
   connects to the bridge: `godotty_bridge_client.gd` (TCP + dispatch), `godotty_commands.gd`
   (screenshot, wait, tree, get/set props), `godotty_input.gd` (input simulation). Its GUT tests are
   in `addon/tests/` (not shipped) and run via `test/integration/addon.test.ts`.
+- Editor plugin: `addon/addons/godotty_mcp/plugin.gd` polls `res://.godot/godotty_mcp/session.json`
+  (written 0600 by the server's `services.start()`, removed on exit) and connects as the "editor"
+  peer; `editor/godotty_editor_commands.gd` extends the runtime commands (shared tree/props code,
+  paths relative to the edited scene root) and turns each edit into ONE `EditorUndoRedoManager`
+  action named "Godotty: …", validating everything before the action starts. The demo project
+  enables it through a symlink (`examples/demo-project/addons/godotty_mcp` → `addon/...`).
 - `examples/demo-project/` — small Godot 4 3D project (GL Compatibility renderer, so it renders under
   Mesa/xvfb on CI) for demos and integration tests. Its GUT tests (`test/unit/`) need GUT:
   `scripts/fetch-test-addons.sh gut examples/demo-project` (addons/gut is gitignored).
@@ -92,4 +98,7 @@ Known problems: `FLAGS.md`.
 - The only network access is `godot_docs` fetching class XML from raw.githubusercontent.com
   (URL contains only the Godot version and class name); `--offline` / `GODOTTY_OFFLINE=1` turns it
   off. Never add other network calls without an equivalent switch.
+- Every Godot process the server spawns carries `GODOTTY_NO_EDITOR_BRIDGE=1` (set in
+  `GodotExecutable.spawn`); the plugin stays offline there, so only the user's own editor is ever
+  "the editor". `check_scripts` never starts a headless editor while that editor is connected.
 - Every bug fix gets a regression test.

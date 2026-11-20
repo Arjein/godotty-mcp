@@ -22,6 +22,8 @@ export function copyDemoProject(dest: string): void {
   );
   cpSync(DEMO_PROJECT, dest, {
     recursive: true,
+    // addons/godotty_mcp is a symlink to the repo's addon; copy its contents.
+    dereference: true,
     filter: (src) => !excluded.some((e) => src === e || src.startsWith(`${e}${path.sep}`)),
   });
 }

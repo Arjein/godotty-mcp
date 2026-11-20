@@ -28,4 +28,9 @@
 - [2026-11-20] `override.cfg` lives only from launch until the helper reports ready (or the launch
   fails), then the user's file is restored; a marker line lets the next server start recover
   after a crash.
+- [2026-11-20] Editor tools (`open_scene`, `add_node`, `remove_node`, `update_node`,
+  `save_scene`) are always listed and return EDITOR_NOT_CONNECTED with setup steps when the plugin
+  isn't connected — tool-list change notifications aren't reliable across clients. Edits apply to
+  the scene currently open in the editor; `undo`/`redo` exist on the bridge (used by tests) but are
+  not exposed as tools yet.
 - [2026-11-20] TypeScript pinned to 6.0.x (typescript-eslint 8.x supports `<6.1`).

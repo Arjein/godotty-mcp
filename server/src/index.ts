@@ -17,6 +17,7 @@ async function main(): Promise<void> {
   process.stdin.on('close', shutdown);
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  await services.start();
   await server.connect(new StdioServerTransport());
   console.error(
     `godotty-mcp: serving ${config.projectPath} (${registeredTools.length} tools, godot: ${config.godotPath})`,

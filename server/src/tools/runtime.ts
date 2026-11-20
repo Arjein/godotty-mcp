@@ -1,7 +1,14 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
-import type { InputStep, TreeNode } from '../bridge/protocol.js';
+import type {
+  GetPropsParams,
+  GetPropsResult,
+  InputStep,
+  TreeNode,
+  TreeParams,
+  TreeResult,
+} from '../bridge/protocol.js';
 import { ErrorCode, ToolError } from '../util/errors.js';
 import { defineTool, textResult, type ToolContext } from './registry.js';
 
@@ -36,6 +43,32 @@ const nodePath = z
   .describe(
     'Node path: absolute ("/root/Main/Player") or relative to the current scene ("Player", "." = scene root).',
   );
+
+const target = z
+  .enum(['game', 'editor'])
+  .default('game')
+  .describe(
+    '"game" = the running game; "editor" = the scene open in the Godot editor (needs the Godotty addon).',
+  );
+
+type Target = 'game' | 'editor';
+
+/** tree/get_props exist on both peers with identical shapes; route to the requested one. */
+function fetchTree(ctx: ToolContext, where: Target, params: TreeParams): Promise<TreeResult> {
+  return where === 'editor'
+    ? ctx.editor.call('tree', params, COMMAND_SLACK_MS)
+    : ctx.runtime.call('tree', params, COMMAND_SLACK_MS);
+}
+
+function fetchProps(
+  ctx: ToolContext,
+  where: Target,
+  params: GetPropsParams,
+): Promise<GetPropsResult> {
+  return where === 'editor'
+    ? ctx.editor.call('get_props', params, COMMAND_SLACK_MS)
+    : ctx.runtime.call('get_props', params, COMMAND_SLACK_MS);
+}
 
 /** Image content for MCP. */
 function image(data: string): CallToolResult['content'][number] {
@@ -242,25 +275,31 @@ export const wait = defineTool({
 
 export const inspectSceneTree = defineTool({
   name: 'inspect_scene_tree',
-  title: 'Inspect live scene tree',
+  title: 'Inspect scene tree',
   description:
-    "Shows the running game's live node tree (including autoloads and nodes created at runtime): name, " +
-    'class, script, and a short state summary (position, visibility, text). Depth- and size-limited; start ' +
-    'deeper with "node". For saved scenes on disk use read_scene.',
+    "Shows a live node tree: the running game's (target=game: autoloads, nodes created at runtime) or the " +
+    'scene open in the Godot editor, including unsaved edits (target=editor). Each node: name, class, ' +
+    'script, and a short state summary (position, visibility, text). Depth- and size-limited; start deeper ' +
+    'with "node". For scene files on disk use read_scene.',
   inputSchema: {
-    node: nodePath.default('').describe('Start node; "" = the whole tree (/root).'),
+    target: target,
+    node: nodePath
+      .default('')
+      .describe('Start node; "" = the whole tree (game: /root, editor: scene root).'),
     depth: z.number().int().min(0).max(MAX_TREE_DEPTH).default(DEFAULT_TREE_DEPTH),
     max_nodes: z.number().int().min(1).max(MAX_TREE_NODES).default(DEFAULT_TREE_NODES),
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (args, ctx) => {
-    const result = await ctx.runtime.call(
-      'tree',
-      { path: args.node, depth: args.depth, max_nodes: args.max_nodes },
-      COMMAND_SLACK_MS,
-    );
+    const result = await fetchTree(ctx, args.target, {
+      path: args.node,
+      depth: args.depth,
+      max_nodes: args.max_nodes,
+    });
     const lines = [
-      `Live tree at ${result.path} (current scene: ${result.current_scene || 'none'})`,
+      args.target === 'editor'
+        ? `Editor scene ${result.current_scene || '(never saved)'} at ${result.path}`
+        : `Live tree at ${result.path} (current scene: ${result.current_scene || 'none'})`,
     ];
     renderTree(result.root, '', '', lines);
     if (result.truncated)
@@ -294,12 +333,14 @@ function renderTree(node: TreeNode, prefix: string, childPrefix: string, lines: 
 
 export const getNodeProperties = defineTool({
   name: 'get_node_properties',
-  title: 'Get live node properties',
+  title: 'Get node properties',
   description:
-    'Reads property values of a node in the running game. Pass "properties" for specific ones (sub-properties ' +
+    'Reads property values of a node in the running game (target=game) or in the scene open in the editor ' +
+    '(target=editor). Pass "properties" for specific ones (sub-properties ' +
     'like "position:x" work), or list the inspector-visible and script properties, optionally filtered by ' +
     'name. Values use Godot syntax (Vector3(1, 0, 2)).',
   inputSchema: {
+    target: target,
     node: nodePath,
     properties: z.array(z.string().max(MAX_NAME_CHARS)).max(MAX_PROPS).default([]),
     filter: z
@@ -311,11 +352,12 @@ export const getNodeProperties = defineTool({
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (args, ctx) => {
-    const result = await ctx.runtime.call(
-      'get_props',
-      { path: args.node, names: args.properties, filter: args.filter, max: args.limit },
-      COMMAND_SLACK_MS,
-    );
+    const result = await fetchProps(ctx, args.target, {
+      path: args.node,
+      names: args.properties,
+      filter: args.filter,
+      max: args.limit,
+    });
     const script = result.script === undefined ? '' : `, script ${result.script}`;
     const shown =
       result.props.length < result.total

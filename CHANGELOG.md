@@ -10,6 +10,10 @@ All notable changes to this project are documented here. The format follows
 
 - Project named **Godotty** (npm package `godotty-mcp`, addon `addons/godotty_mcp`).
 - Repository skeleton: MCP server package (TypeScript, stdio), editor addon stub, demo project, CI.
+- Godot editor plugin (`addons/godotty_mcp`) and editor tools: `open_scene` (or create),
+  `add_node` (class or scene instance), `remove_node`, `update_node` (properties, rename, reparent,
+  script), `save_scene` — each one undoable step in the editor. `inspect_scene_tree` and
+  `get_node_properties` take `target: editor` to see the edited scene, unsaved changes included.
 - See and play the running game: `screenshot` (images, frame sequences), `send_input` (actions,
   keys, mouse, holds, waits; optional screenshot after), `wait` (frames, seconds, or a node/property
   condition), `inspect_scene_tree`, `get_node_properties`, `set_node_property` — over a

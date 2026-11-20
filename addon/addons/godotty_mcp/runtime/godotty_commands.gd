@@ -1,3 +1,4 @@
+@tool
 extends RefCounted
 ## Runtime commands for the godotty-mcp bridge: screenshot, input, wait, tree, get/set properties.
 ##
@@ -117,17 +118,16 @@ func _check(condition: Dictionary) -> Dictionary:
 
 func _cmd_tree(params: Dictionary) -> Dictionary:
 	var path: String = str(params.get("path", ""))
-	var start: Node = _host.get_tree().root if path == "" else _resolve(path)
+	var start: Node = _tree_start(path)
 	if start == null:
 		return _error("NODE_NOT_FOUND", "No node at '%s'." % path)
 	# [nodes left, 1 if anything was left out because of the budget]
 	var budget: Array[int] = [int(params.get("max_nodes", 200)), 0]
 	var tree: Dictionary = _serialize(start, int(params.get("depth", 4)), budget)
-	var scene: Node = _host.get_tree().current_scene
 	var result: Dictionary = {
 		"root": tree,
-		"path": str(start.get_path()),
-		"current_scene": str(scene.get_path()) if scene != null else "",
+		"path": _display_path(start),
+		"current_scene": _current_scene_label(),
 		"truncated": budget[1] == 1,
 	}
 	return _ok(result)
@@ -249,7 +249,7 @@ func _cmd_set_props(params: Dictionary) -> Dictionary:
 	for name: Variant in parsed:
 		node.set_indexed(NodePath(str(name)), parsed[name])
 		props.append(_prop_entry(node, str(name), _property_info(node, str(name))))
-	return _ok({"path": str(node.get_path()), "props": props})
+	return _ok({"path": _display_path(node), "props": props})
 
 
 ## Validates one `name = literal` assignment into `parsed`; returns "" or a problem description.
@@ -317,11 +317,27 @@ func _enum_label(info: Dictionary, value: Variant) -> String:
 
 
 func _node_header(node: Node) -> Dictionary:
-	var header: Dictionary = {"path": str(node.get_path()), "class": node.get_class()}
+	var header: Dictionary = {"path": _display_path(node), "class": node.get_class()}
 	var script: Script = node.get_script()
 	if script != null and script.resource_path != "":
 		header["script"] = script.resource_path
 	return header
+
+
+## Where "tree" starts for an empty path: the whole scene tree in a game.
+func _tree_start(path: String) -> Node:
+	return _host.get_tree().root if path == "" else _resolve(path)
+
+
+## Names the scene the paths refer to, for "tree" results.
+func _current_scene_label() -> String:
+	var scene: Node = _host.get_tree().current_scene
+	return str(scene.get_path()) if scene != null else ""
+
+
+## How node paths are shown to the agent: absolute in a game.
+func _display_path(node: Node) -> String:
+	return str(node.get_path())
 
 
 ## Absolute paths ("/root/Main/Player") or paths relative to the current scene ("Player").

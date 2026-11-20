@@ -15,7 +15,7 @@ describe('parseProjectFile', () => {
       features: ['4.5', 'GL Compatibility'],
       renderer: 'gl_compatibility',
       autoloads: [],
-      enabledPlugins: [],
+      enabledPlugins: ['res://addons/godotty_mcp/plugin.cfg'],
     });
     expect(project.inputActions).toEqual([
       { name: 'move_left', deadzone: 0.2, events: ['A (physical)'] },
