@@ -99,7 +99,7 @@ install-addon` copies it into a project; `scripts/package-addon.sh` builds the r
 - Godot facts this code relies on (exit codes, LSP handshake, Logger, override.cfg, doctool):
   `docs/agents/godot-behavior.md`. Read it before touching `src/godot/`.
 - fast-xml-parser refuses elements named `constructor` (prototype-pollution guard); `class-xml.ts`
-  renames them to `ctor` before parsing — keep that when touching XML parsing (JUnit in M4 too).
+  renames them to `ctor` before parsing — keep that in any new XML parsing.
 - The only network access is `godot_docs` fetching class XML from raw.githubusercontent.com
   (URL contains only the Godot version and class name); `--offline` / `GODOTTY_OFFLINE=1` turns it
   off. Never add other network calls without an equivalent switch.
