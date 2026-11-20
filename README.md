@@ -21,7 +21,7 @@ reference _of your installed Godot version_, and run your GUT or gdUnit4 tests.
 <!-- Demo GIF placeholder: a recording of an agent play-testing examples/demo-project goes here,
      e.g. ![Godotty play-testing the demo project](docs/media/demo.gif) -->
 
-> Status: **0.1.0** — first public release. Tool names and inputs may still change before 1.0.
+> Status: **0.2.0**. Tool names and inputs may still change before 1.0.
 
 ## What makes it different
 

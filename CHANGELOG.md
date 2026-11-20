@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
 ### Added
 
 - `pause_game` and `step_game`: freeze the running game between agent calls and advance exact
@@ -29,6 +31,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `send_input` holds no longer end early when the game window gains or loses focus (Godot releases
+  all pressed input then; holds now press again).
 - The server no longer exits when the project folder has no `project.godot` yet (clients only saw
   "Connection closed"). Project tools return `NOT_FOUND` until it exists and then work without a
   restart; `godot_docs` works throughout.
@@ -84,6 +88,7 @@ First public release.
 - Server core: config (`--project`, `--godot`, `--allow-eval`), project-root path sandbox,
   pagination/truncation helpers, tool registry with actionable error results.
 
-[Unreleased]: https://github.com/Arjein/godotty-mcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Arjein/godotty-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Arjein/godotty-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Arjein/godotty-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Arjein/godotty-mcp/releases/tag/v0.1.0
