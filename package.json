@@ -1,0 +1,31 @@
+{
+  "name": "godot-mcp-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "MCP server, editor plugin and runtime helper that let AI agents edit, run, see and play-test Godot 4 projects.",
+  "license": "MIT",
+  "workspaces": [
+    "server"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build -w server",
+    "typecheck": "npm run typecheck -w server",
+    "test": "npm run test -w server",
+    "coverage": "npm run coverage -w server",
+    "lint": "npm run lint:ts && npm run lint:gd",
+    "lint:ts": "eslint . && prettier --check .",
+    "lint:gd": "gdlint addon examples/demo-project && gdformat --check addon examples/demo-project",
+    "format": "prettier --write . && gdformat addon examples/demo-project"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "typescript-eslint": "^8.73.0"
+  }
+}

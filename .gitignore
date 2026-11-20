@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+# Godot
+.godot/
+*.import
+!examples/demo-project/**/*.import.keep
+export_presets.cfg
+# Downloaded test addons (fetched by scripts, pinned versions)
+examples/demo-project/addons/gut/
+examples/demo-project/addons/gdUnit4/
