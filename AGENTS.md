@@ -1,4 +1,4 @@
-# godot-mcp — agent guide
+# Godotty (`godotty-mcp`) — agent guide
 
 MCP server + Godot editor plugin + runtime helper that let AI agents edit, **run, see, play-test
 and debug** Godot 4 projects. Full plan and milestones: `docs/PLAN.md`. Decisions: `DECISIONS.md`.
@@ -17,7 +17,7 @@ Known problems: `FLAGS.md`.
   - `src/util/` `errors.ts` (ToolError + codes), `sandbox.ts` (path resolution), `paginate.ts`.
   - `test/` Vitest unit tests mirror `src/`; `test/integration/` runs real Godot (excluded from
     `npm test`).
-- `addon/addons/godot_mcp/` — GDScript editor plugin + runtime helper. Statically typed.
+- `addon/addons/godotty_mcp/` — GDScript editor plugin + runtime helper. Statically typed.
 - `examples/demo-project/` — small Godot 4 3D project (GL Compatibility renderer, so it renders under
   Mesa/xvfb on CI) for demos and integration tests.
 

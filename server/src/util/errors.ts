@@ -40,5 +40,5 @@ export function formatError(error: unknown): string {
     return `Error [${error.code}]: ${error.message}${hint}`;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return `Error [${ErrorCode.Internal}]: ${message}\nHint: This is a bug in godot-mcp; please report it with the steps that led here.`;
+  return `Error [${ErrorCode.Internal}]: ${message}\nHint: This is a bug in godotty-mcp; please report it with the steps that led here.`;
 }

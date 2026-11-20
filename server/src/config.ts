@@ -17,13 +17,13 @@ export interface ServerConfig {
 export const ENV = {
   project: 'GODOT_PROJECT_PATH',
   godot: 'GODOT_PATH',
-  allowEval: 'GODOT_MCP_ALLOW_EVAL',
+  allowEval: 'GODOTTY_ALLOW_EVAL',
 } as const;
 
 const DEFAULT_GODOT = 'godot';
 const PROJECT_FILE = 'project.godot';
 
-export const USAGE = `Usage: godot-mcp [--project <dir>] [--godot <executable>] [--allow-eval]
+export const USAGE = `Usage: godotty-mcp [--project <dir>] [--godot <executable>] [--allow-eval]
 
   --project <dir>    Godot project root (env ${ENV.project}; default: current directory)
   --godot <path>     Godot 4 executable (env ${ENV.godot}; default: "godot" on PATH)

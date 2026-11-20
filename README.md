@@ -1,8 +1,8 @@
-# godot-mcp
+# Godotty
 
 > **Status: early development (pre-0.1).** Not published yet.
 
-An MCP server for **Godot 4** that lets AI coding agents (Claude Code, Claude Desktop, Cursor, …)
+**Godotty** (`godotty-mcp`) is an MCP server for **Godot 4** that lets AI coding agents (Claude Code, Claude Desktop, Cursor, …)
 not only edit your project but **run it, see it, play-test it and debug it**: screenshots, simulated
 input, live scene inspection, real diagnostics from Godot's own tooling, version-correct docs and
 structured test results.

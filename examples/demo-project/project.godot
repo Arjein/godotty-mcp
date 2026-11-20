@@ -1,12 +1,12 @@
 ; Engine configuration file.
-; Demo project for godot-mcp: used for demos and integration tests.
+; Demo project for godotty-mcp: used for demos and integration tests.
 
 config_version=5
 
 [application]
 
-config/name="godot-mcp demo"
-config/description="Small 3D scene with a controllable player, used by godot-mcp's integration tests."
+config/name="godotty-mcp demo"
+config/description="Small 3D scene with a controllable player, used by godotty-mcp's integration tests."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 

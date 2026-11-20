@@ -15,7 +15,7 @@ describe('ProjectSandbox', () => {
 
   beforeEach(() => {
     project = makeTempProject({ 'scenes/main.tscn': '' });
-    outside = mkdtempSync(path.join(tmpdir(), 'godot-mcp-outside-'));
+    outside = mkdtempSync(path.join(tmpdir(), 'godotty-mcp-outside-'));
     sandbox = new ProjectSandbox(project.root);
   });
 

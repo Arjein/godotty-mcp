@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Project named **Godotty** (npm package `godotty-mcp`, addon `addons/godotty_mcp`).
 - Repository skeleton: MCP server package (TypeScript, stdio), editor addon stub, demo project, CI.
 - Server core: config (`--project`, `--godot`, `--allow-eval`), project-root path sandbox,
   pagination/truncation helpers, tool registry with actionable error results.

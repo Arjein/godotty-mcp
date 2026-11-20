@@ -1,5 +1,5 @@
 {
-  "name": "godot-mcp-monorepo",
+  "name": "godotty-mcp-monorepo",
   "private": true,
   "type": "module",
   "description": "MCP server, editor plugin and runtime helper that let AI agents edit, run, see and play-test Godot 4 projects.",

@@ -1,4 +1,4 @@
-# godot-mcp plan (approved 2026-11-20)
+# Godotty plan (approved 2026-11-20)
 
 ## Goal
 
@@ -17,12 +17,12 @@ AI client ──stdio/MCP──► server (Node 20+, TypeScript)
 ```
 
 - **Bridge direction:** the server listens; the plugin and the game connect. The server writes
-  `res://.godot/godot_mcp/session.json` (port, 256-bit token, protocol version); the editor plugin
+  `res://.godot/godotty_mcp/session.json` (port, 256-bit token, protocol version); the editor plugin
   polls for it. A game launched by `run_game` receives port + token as user args
   (`-- --mcp-port=… --mcp-token=…`). Loopback only; first message must carry the token.
 - **Runtime helper injection:** `run_game` registers the helper as an autoload for that launch only
   (temporary `override.cfg`, removed on exit), so it works without the addon installed in the
-  project. To verify on 4.7 in M2/M5; fallback: copy to `.godot/godot_mcp/` and pass `--script`.
+  project. To verify on 4.7 in M2/M5; fallback: copy to `.godot/godotty_mcp/` and pass `--script`.
 - **Diagnostics:** `check_scripts` uses GDScript LSP diagnostics: the editor's LSP if open,
   otherwise an on-demand headless editor (`--headless --editor --lsp-port`), kept warm while idle.
   Fallback: per-file `--check-only`. `get_errors` uses the runtime helper's `Logger`
@@ -30,7 +30,7 @@ AI client ──stdio/MCP──► server (Node 20+, TypeScript)
   before the autoload loads.
 - **Docs:** `godot --headless --doctool <tmp>` dumps the exact installed version's class reference
   (including GDExtensions); parsed once into a compact JSON index cached at
-  `~/.cache/godot-mcp/docs/<version-hash>/`.
+  `~/.cache/godotty-mcp/docs/<version-hash>/`.
 - **Screenshots** need a real renderer: `run_game` is windowed by default. CI uses `xvfb-run` with
   `--rendering-driver opengl3` on Mesa llvmpipe.
 - **v2 debugger:** DAP client against the editor's debug adapter (port 6006); `bridge/` and

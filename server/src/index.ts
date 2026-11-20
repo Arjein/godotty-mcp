@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   const { server, registeredTools } = createServer(config);
   await server.connect(new StdioServerTransport());
   console.error(
-    `godot-mcp: serving ${config.projectPath} (${registeredTools.length} tools, godot: ${config.godotPath})`,
+    `godotty-mcp: serving ${config.projectPath} (${registeredTools.length} tools, godot: ${config.godotPath})`,
   );
 }
 

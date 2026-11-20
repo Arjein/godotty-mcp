@@ -7,7 +7,7 @@ export function makeTempProject(files: Record<string, string> = {}): {
   root: string;
   cleanup: () => void;
 } {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'godot-mcp-test-')));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'godotty-mcp-test-')));
   writeFileSync(path.join(root, 'project.godot'), 'config_version=5\n');
   for (const [relative, content] of Object.entries(files)) {
     const file = path.join(root, relative);
