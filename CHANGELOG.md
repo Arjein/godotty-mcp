@@ -6,14 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- A game or headless editor no longer keeps running after the MCP server is killed hard (SIGKILL):
-  a small guard process stops it (macOS, Linux). Run info now shows Godot's own pid.
+- Godotty logo and banner (`docs/media/`) and a README header with badges.
 
 ## [0.1.0] - 2026-11-20
 
 First public release.
+
+### Fixed
+
+- A game or headless editor no longer keeps running after the MCP server is killed hard (SIGKILL):
+  a small guard process stops it (macOS, Linux). Run info now shows Godot's own pid.
 
 ### Added
 

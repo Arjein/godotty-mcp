@@ -1,6 +1,16 @@
-# Godotty
+<h1 align="center">
+  <img src="https://raw.githubusercontent.com/Arjein/godotty-mcp/main/docs/media/godotty-banner.png" alt="Godotty: let AI agents build, run and play-test your Godot games" width="760">
+</h1>
 
-**An MCP server that lets AI coding agents play-test your Godot 4 game — not just edit it.**
+<p align="center">
+  <a href="https://www.npmjs.com/package/godotty-mcp"><img src="https://img.shields.io/npm/v/godotty-mcp?color=478CBF&label=npm" alt="npm version"></a>
+  <a href="https://github.com/Arjein/godotty-mcp/actions/workflows/ci.yml"><img src="https://github.com/Arjein/godotty-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Godot-4.5%2B-478CBF?logo=godotengine&logoColor=white" alt="Godot 4.5+">
+  <img src="https://img.shields.io/badge/MCP-server-2B2B2B" alt="MCP server">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-FFB547" alt="MIT license"></a>
+</p>
+
+<p align="center"><b>An MCP server that lets AI coding agents play-test your Godot 4 game — not just edit it.</b></p>
 
 Godotty (`godotty-mcp`) connects Claude Code, Claude Desktop, Cursor and other MCP clients to a
 Godot 4 project. Besides reading and editing, the agent can **run the game, see it, play it and
