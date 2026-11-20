@@ -93,6 +93,23 @@ describe('findRuntimeSourceDir', () => {
     }
   });
 
+  it('prefers the repo addon over a stale npm pack copy in a source checkout', () => {
+    const project = makeTempProject({
+      'repo/server/addon/godotty_mcp/runtime/godotty_runtime.gd': '',
+      'repo/addon/addons/godotty_mcp/runtime/godotty_runtime.gd': '',
+    });
+    try {
+      const moduleUrl = pathToFileURL(
+        path.join(project.root, 'repo/server/src/godot/runtime-injection.ts'),
+      ).href;
+      expect(findRuntimeSourceDir(moduleUrl)).toBe(
+        path.join(project.root, 'repo/addon/addons/godotty_mcp/runtime'),
+      );
+    } finally {
+      project.cleanup();
+    }
+  });
+
   it('explains a broken installation', () => {
     expect(() => findRuntimeSourceDir('file:///nowhere/dist/godot/x.js')).toThrow(
       /Godotty addon not found/,

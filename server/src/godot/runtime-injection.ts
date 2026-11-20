@@ -97,9 +97,10 @@ export class RuntimeInjection {
  */
 export function findAddonDir(moduleUrl: string = import.meta.url): string {
   const here = path.dirname(fileURLToPath(moduleUrl));
+  // A source checkout first: there, ../../addon is the copy `npm pack` leaves behind, and stale.
   const candidates = [
-    path.resolve(here, '../../addon/godotty_mcp'),
     path.resolve(here, '../../../addon/addons/godotty_mcp'),
+    path.resolve(here, '../../addon/godotty_mcp'),
   ];
   const found = candidates.find((dir) => existsSync(path.join(dir, 'runtime', RUNTIME_ENTRY)));
   if (found === undefined) {
