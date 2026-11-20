@@ -13,3 +13,10 @@ export_presets.cfg
 # Downloaded test addons (fetched by scripts, pinned versions)
 examples/demo-project/addons/gut/
 examples/demo-project/addons/gdUnit4/
+
+# Copied into the npm package by scripts/prepare-package.mjs
+server/addon/
+server/README.md
+server/LICENSE
+server/CHANGELOG.md
+release/

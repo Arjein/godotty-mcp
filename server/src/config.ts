@@ -30,6 +30,7 @@ const DEFAULT_GODOT = 'godot';
 const PROJECT_FILE = 'project.godot';
 
 export const USAGE = `Usage: godotty-mcp [--project <dir>] [--godot <executable>] [--allow-eval]
+       godotty-mcp install-addon [--project <dir>] [--force]
 
   --project <dir>    Godot project root (env ${ENV.project}; default: current directory)
   --godot <path>     Godot 4 executable (env ${ENV.godot}; default: "godot" on PATH)

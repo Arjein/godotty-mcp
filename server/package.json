@@ -1,16 +1,40 @@
 {
   "name": "godotty-mcp",
-  "version": "0.0.0",
-  "private": true,
-  "description": "MCP server that lets AI agents edit, run, see and play-test Godot 4 projects.",
+  "version": "0.1.0",
+  "description": "MCP server that lets AI agents edit, run, see and play-test Godot 4 games: screenshots, input, live inspection, undoable editor edits, version-correct docs and structured test results.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "godot",
+    "godot4",
+    "gdscript",
+    "ai",
+    "claude",
+    "gamedev",
+    "game-testing"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arjein/godotty-mcp.git",
+    "directory": "server"
+  },
+  "homepage": "https://github.com/Arjein/godotty-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/Arjein/godotty-mcp/issues"
+  },
   "type": "module",
   "bin": {
     "godotty-mcp": "dist/index.js"
   },
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.map",
+    "addon",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20"
@@ -20,7 +44,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "prepack": "npm run build && node ../scripts/prepare-package.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

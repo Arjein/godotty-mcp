@@ -92,20 +92,25 @@ export class RuntimeInjection {
 }
 
 /**
- * Finds the runtime helper sources: next to the published package (`<pkg>/runtime`) or, in a
- * repository checkout, in the addon folder.
+ * Finds the Godotty addon folder (addons/godotty_mcp): inside the published package
+ * (`<pkg>/addon/godotty_mcp`) or, in a repository checkout, `addon/addons/godotty_mcp`.
  */
-export function findRuntimeSourceDir(moduleUrl: string = import.meta.url): string {
+export function findAddonDir(moduleUrl: string = import.meta.url): string {
   const here = path.dirname(fileURLToPath(moduleUrl));
   const candidates = [
-    path.resolve(here, '../../runtime'),
-    path.resolve(here, '../../../addon/addons/godotty_mcp/runtime'),
+    path.resolve(here, '../../addon/godotty_mcp'),
+    path.resolve(here, '../../../addon/addons/godotty_mcp'),
   ];
-  const found = candidates.find((dir) => existsSync(path.join(dir, RUNTIME_ENTRY)));
+  const found = candidates.find((dir) => existsSync(path.join(dir, 'runtime', RUNTIME_ENTRY)));
   if (found === undefined) {
     throw new Error(
-      `Runtime helper not found (looked in: ${candidates.join(', ')}). The installation is incomplete.`,
+      `Godotty addon not found (looked in: ${candidates.join(', ')}). The installation is incomplete.`,
     );
   }
   return found;
+}
+
+/** The runtime helper sources inside the addon. */
+export function findRuntimeSourceDir(moduleUrl: string = import.meta.url): string {
+  return path.join(findAddonDir(moduleUrl), 'runtime');
 }

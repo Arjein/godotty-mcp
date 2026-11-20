@@ -1,5 +1,8 @@
 # Godotty plan (approved 2026-11-20)
 
+> Status: milestones 1–8 complete (v0.1.0 prepared). Deviations are recorded in DECISIONS.md
+> (TCP instead of WebSocket for the bridge; editor tools always listed).
+
 ## Goal
 
 An open-source MCP server for Godot 4 that lets AI agents edit a project **and run, see, play-test

@@ -6,9 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-20
+
+First public release.
+
 ### Added
 
 - Project named **Godotty** (npm package `godotty-mcp`, addon `addons/godotty_mcp`).
+- `godotty-mcp install-addon` copies the editor plugin into a project; the npm package ships the
+  addon, and `scripts/package-addon.sh` builds the addon zip for releases.
+- README (quick start for Claude Code, Claude Desktop, Cursor; tool reference; safety;
+  troubleshooting), CONTRIBUTING, docs/ARCHITECTURE.md, docs/RELEASING.md, issue/PR templates.
 - Repository skeleton: MCP server package (TypeScript, stdio), editor addon stub, demo project, CI.
 - `eval_gdscript` (opt-in via `--allow-eval`): run GDScript in the game or editor, with parse and
   runtime errors reported by line. Godot refuses eval unless the server enabled it.
@@ -35,3 +43,6 @@ All notable changes to this project are documented here. The format follows
 - Integration tests against real Godot; CI integration job for Godot 4.5.2 and 4.7.2.
 - Server core: config (`--project`, `--godot`, `--allow-eval`), project-root path sandbox,
   pagination/truncation helpers, tool registry with actionable error results.
+
+[Unreleased]: https://github.com/Arjein/godotty-mcp/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Arjein/godotty-mcp/releases/tag/v0.1.0

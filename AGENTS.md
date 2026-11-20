@@ -52,6 +52,11 @@ Known problems: `FLAGS.md`.
 - `examples/demo-project/` — small Godot 4 3D project (GL Compatibility renderer, so it renders under
   Mesa/xvfb on CI) for demos and integration tests. Its GUT tests (`test/unit/`) need GUT:
   `scripts/fetch-test-addons.sh gut examples/demo-project` (addons/gut is gitignored).
+- Packaging: `server/package.json` `prepack` builds and runs `scripts/prepare-package.mjs`, which
+  copies the addon (to `server/addon/godotty_mcp`), README, LICENSE and CHANGELOG into the package
+  (gitignored). The installed package finds its addon via `findAddonDir`. `godotty-mcp
+install-addon` copies it into a project; `scripts/package-addon.sh` builds the release zip.
+  Release steps: `docs/RELEASING.md`. Versions in `server/package.json` and `plugin.cfg` must match.
 - `scripts/fetch-test-addons.sh <gut|gdunit4> <project> [minor]` installs pinned, SHA-256-checked
   test frameworks (GUT release chosen per Godot minor); `scripts/gen-input-names.py` regenerates
   `input-names.ts`.

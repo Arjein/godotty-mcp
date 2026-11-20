@@ -78,14 +78,16 @@ describe('findRuntimeSourceDir', () => {
     expect(existsSync(path.join(findRuntimeSourceDir(), RUNTIME_ENTRY))).toBe(true);
   });
 
-  it('prefers a packaged runtime folder next to the package', () => {
-    const project = makeTempProject({ 'pkg/runtime/godotty_runtime.gd': '' });
+  it('prefers the addon copy inside the published package', () => {
+    const project = makeTempProject({ 'pkg/addon/godotty_mcp/runtime/godotty_runtime.gd': '' });
     try {
       mkdirSync(path.join(project.root, 'pkg/dist/godot'), { recursive: true });
       const moduleUrl = pathToFileURL(
         path.join(project.root, 'pkg/dist/godot/runtime-injection.js'),
       ).href;
-      expect(findRuntimeSourceDir(moduleUrl)).toBe(path.join(project.root, 'pkg/runtime'));
+      expect(findRuntimeSourceDir(moduleUrl)).toBe(
+        path.join(project.root, 'pkg/addon/godotty_mcp/runtime'),
+      );
     } finally {
       project.cleanup();
     }
@@ -93,7 +95,7 @@ describe('findRuntimeSourceDir', () => {
 
   it('explains a broken installation', () => {
     expect(() => findRuntimeSourceDir('file:///nowhere/dist/godot/x.js')).toThrow(
-      /Runtime helper not found/,
+      /Godotty addon not found/,
     );
   });
 });

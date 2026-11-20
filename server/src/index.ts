@@ -2,12 +2,19 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { HelpRequested, loadConfig, USAGE } from './config.js';
+import { INSTALL_COMMAND, runInstallCommand } from './install-addon.js';
 import { createServer } from './server.js';
 import { formatError } from './util/errors.js';
 
 /** stdio entry point. stdout belongs to the MCP protocol, so all diagnostics go to stderr. */
 async function main(): Promise<void> {
-  const config = loadConfig(process.argv.slice(2), process.env, process.cwd());
+  const argv = process.argv.slice(2);
+  if (argv[0] === INSTALL_COMMAND) {
+    // A one-shot CLI command, not an MCP session: plain output on stdout.
+    console.log(runInstallCommand(argv.slice(1), process.cwd()));
+    return;
+  }
+  const config = loadConfig(argv, process.env, process.cwd());
   const { server, registeredTools, services } = createServer(config);
   const shutdown = (): void => {
     services.dispose();

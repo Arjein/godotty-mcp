@@ -37,6 +37,6 @@ export default tseslint.config(
     files: ['server/src/godot/input-names.ts'],
     rules: { '@typescript-eslint/no-magic-numbers': 'off' },
   },
-  { files: ['**/*.js'], ...tseslint.configs.disableTypeChecked },
+  { files: ['**/*.js', '**/*.mjs'], ...tseslint.configs.disableTypeChecked },
   prettier,
 );
