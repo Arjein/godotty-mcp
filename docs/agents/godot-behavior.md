@@ -24,6 +24,9 @@ version; the integration suite (`npm run test:integration`) exercises most of th
   project it has open — used to check the editor's LSP serves _this_ project.
 - `textDocument/didOpen` triggers `publishDiagnostics` for that file: 0-based lines/columns,
   severity 1 = error, 2 = warning (e.g. `(UNUSED_VARIABLE): ...`).
+- Godot parses only the `text` it is sent and never reads the file from disk: `didOpen` without
+  `text` parses `<null>` (false "Unexpected "<" in class body."), and `didSave` without `text`
+  publishes nothing (4.7.2). So `check_scripts` must send the script text.
 - Also sends `gdscript/capabilities` (native class list) — ignore it.
 
 ## Runtime errors

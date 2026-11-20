@@ -64,8 +64,9 @@ caps; tool inputs (screenshot counts, input steps, tree sizes, timeouts) are bou
   text to whatever answers there after checking that it reports this project's path. On a shared
   machine another user could listen on that port; pass `--lsp-port` to a port you control or
   block it.
-- **If the MCP server is killed hard** (SIGKILL), a running game or headless editor it started may
-  keep running until you close it.
+- **If the MCP server is killed hard** (SIGKILL), a small guard process between it and Godot
+  notices and stops the game or headless editor it started (macOS, Linux). On Windows they may
+  keep running until you close them.
 - **Session files left by a crashed server** are harmless (the proof check above), but contain an
   expired token; Godotty replaces them on the next start.
 

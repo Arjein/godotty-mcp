@@ -103,9 +103,14 @@ install-addon` copies it into a project; `scripts/package-addon.sh` builds the r
 - The only network access is `godot_docs` fetching class XML from raw.githubusercontent.com
   (URL contains only the Godot version and class name); `--offline` / `GODOTTY_OFFLINE=1` turns it
   off. Never add other network calls without an equivalent switch.
+- Long-lived Godot processes (games, headless LSP editor) start via `GodotExecutable.spawnGuarded`:
+  a `node -e` guard (`process-guard.ts`) holds a never-written stdin pipe and stops Godot when the
+  server dies, even by SIGKILL. Stop them only with `killGracefully` (it never SIGKILLs a guard
+  first, which would orphan Godot); `run.pid` comes from the helper's `ready` record. Fakes see
+  Godot's own args with `call.guarded` (`test/helpers/fake-process.ts`). Plain `spawn` on Windows.
 - Every Godot process the server spawns carries `GODOTTY_NO_EDITOR_BRIDGE=1` (set in
-  `GodotExecutable.spawn`); the plugin stays offline there, so only the user's own editor is ever
-  "the editor". `check_scripts` never starts a headless editor while that editor is connected.
+  `GodotExecutable.spawn` and `spawnGuarded`); the plugin stays offline there, so only the user's
+  own editor is ever "the editor". `check_scripts` never starts a headless editor while that editor is connected.
 - Security invariants (see docs/SECURITY.md; regression tests in `server/test/security.test.ts`):
   per-role bridge tokens + HMAC welcome proof (Godot ignores requests until verified); value
   literals with `Resource(`/`Object(`/`ExtResource(`/`SubResource(` refused on both sides unless

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A game or headless editor no longer keeps running after the MCP server is killed hard (SIGKILL):
+  a small guard process stops it (macOS, Linux). Run info now shows Godot's own pid.
+
 ## [0.1.0] - 2026-11-20
 
 First public release.
