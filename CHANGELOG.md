@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-20
+
 ### Added
 
 - Godotty logo and banner (`docs/media/`) and a README header with badges.
@@ -53,5 +55,6 @@ First public release.
 - Server core: config (`--project`, `--godot`, `--allow-eval`), project-root path sandbox,
   pagination/truncation helpers, tool registry with actionable error results.
 
-[Unreleased]: https://github.com/Arjein/godotty-mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Arjein/godotty-mcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Arjein/godotty-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Arjein/godotty-mcp/releases/tag/v0.1.0

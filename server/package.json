@@ -1,6 +1,6 @@
 {
   "name": "godotty-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server that lets AI agents edit, run, see and play-test Godot 4 games: screenshots, input, live inspection, undoable editor edits, version-correct docs and structured test results.",
   "keywords": [
     "mcp",
