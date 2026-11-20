@@ -12,6 +12,9 @@ Known problems: `FLAGS.md`.
     executable, `GameManager`, `ScriptChecker`) · `src/config.ts` CLI flags/env.
   - `src/tools/` one file per tool or tool group; each exports `defineTool(...)` objects, listed in
     `src/tools/index.ts`. `registry.ts` wraps handlers so errors become MCP `isError` results.
+    The server starts in a folder without `project.godot`: `runHandler` calls
+    `ctx.requireProject()` first (NOT_FOUND until the file exists; it also publishes the editor
+    session file late). Tools that work without a project set `needsProject: false` (`godot_docs`).
   - `src/godot/` everything that knows Godot: `executable.ts` (spawn/exec, version ≥ 4.5),
     `variant.ts` + `section-file.ts` (text formats of project.godot/.tscn/.tres),
     `project-file.ts`, `scene-file.ts` (parse + render tree), `godot-log.ts` (stderr blocks and
@@ -41,7 +44,11 @@ Known problems: `FLAGS.md`.
   inert unless started with `-- --godotty-events=<file>` and writes JSON lines there (`ready`,
   `error`). With `--godotty-port=<port>` plus the `GODOTTY_BRIDGE_TOKEN` env var (never argv) it
   connects to the bridge: `godotty_bridge_client.gd` (TCP + dispatch), `godotty_commands.gd`
-  (screenshot, wait, tree, get/set props), `godotty_input.gd` (input simulation). Its GUT tests are
+  (screenshot, wait, tree, get/set props, getters, observe), `godotty_input.gd` (input simulation),
+  `godotty_clock.gd` (pause/step: freezes via `SceneTree.paused`; `input`/`wait`/`press` run a frozen
+  game for their duration via `begin()`/`end()` in `run()`), `godotty_controls.gd` (list/press UI:
+  clicks are pushed into the control's own viewport in viewport coordinates; headless runs drop
+  mouse input, so clicks are refused there and `accept` is the fallback). Its GUT tests are
   in `addon/tests/` (not shipped) and run via `test/integration/addon.test.ts`.
 - Editor plugin: `addon/addons/godotty_mcp/plugin.gd` polls `res://.godot/godotty_mcp/session.json`
   (written 0600 by the server's `services.start()`, removed on exit) and connects as the "editor"
@@ -54,7 +61,8 @@ Known problems: `FLAGS.md`.
   `scripts/fetch-test-addons.sh gut examples/demo-project` (addons/gut is gitignored).
 - Packaging: `server/package.json` `prepack` builds and runs `scripts/prepare-package.mjs`, which
   copies the addon (to `server/addon/godotty_mcp`), README, LICENSE and CHANGELOG into the package
-  (gitignored). The installed package finds its addon via `findAddonDir`. `godotty-mcp
+  (gitignored). The installed package finds its addon via `findAddonDir` (a source checkout's `addon/` first, so
+  a leftover packed copy never shadows it). `godotty-mcp
 install-addon` copies it into a project; `scripts/package-addon.sh` builds the release zip.
   Release steps: `docs/RELEASING.md`. Versions in `server/package.json` and `plugin.cfg` must match.
 - `docs/media/` holds the logo and banner. README images use absolute `raw.githubusercontent.com`
@@ -118,7 +126,10 @@ install-addon` copies it into a project; `scripts/package-addon.sh` builds the r
   literals with `Resource(`/`Object(`/`ExtResource(`/`SubResource(` refused on both sides unless
   eval is on (`util/literals.ts`, `_literal_problem`); state under `.godot/godotty_mcp` only via
   `util/state-dir.ts` (no symlinks, 0700/0600, exclusive create); never compile agent-supplied
-  regexes; parsers keep depth limits and linear line handling; `--godotty-*` game args are reserved.
+  regexes; parsers keep depth limits and linear line handling; `--godotty-*` game args are reserved;
+  property reads may call only zero-argument `is_`/`has_`/`can_`/`get_` methods (`_getter_problem`).
 - `eval_gdscript` is registered only with `--allow-eval`, and Godot refuses eval unless launched
   with `--godotty-allow-eval` (game) or a session file with `allow_eval: true` (editor).
+- Godot releases all pressed input when the game window gains or loses focus (a fresh game window
+  does both); `send_input` holds press again whenever that happens (`_hold` in `godotty_input.gd`).
 - Every bug fix gets a regression test.
