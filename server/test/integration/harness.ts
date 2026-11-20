@@ -1,4 +1,5 @@
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -9,9 +10,10 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ServerConfig } from '../../src/config.js';
 import { createServer, type CreatedServer } from '../../src/server.js';
 import type { Services } from '../../src/services.js';
-import { DEMO_PROJECT } from '../helpers/demo.js';
+import { copyDemoProject, DEMO_PROJECT } from '../helpers/demo.js';
 
 export const GODOT = process.env.GODOT_PATH ?? 'godot';
+const REPO_ROOT = path.resolve(DEMO_PROJECT, '../..');
 
 /** A temp copy of the demo project plus extra files, served by a real server + in-memory client. */
 export interface Harness {
@@ -25,12 +27,17 @@ export interface Harness {
   close: () => Promise<void>;
 }
 
+/** Installs a pinned test framework with scripts/fetch-test-addons.sh (cached after first use). */
+export function installTestAddon(root: string, framework: 'gut' | 'gdunit4'): void {
+  execFileSync(path.join(REPO_ROOT, 'scripts', 'fetch-test-addons.sh'), [framework, root], {
+    env: { ...process.env, GODOT_PATH: GODOT },
+    stdio: 'pipe',
+  });
+}
+
 export async function startHarness(extraFiles: Record<string, string> = {}): Promise<Harness> {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'godotty-it-')));
-  cpSync(DEMO_PROJECT, root, {
-    recursive: true,
-    filter: (src) => !src.includes(`${path.sep}.godot`),
-  });
+  copyDemoProject(root);
   for (const [relative, content] of Object.entries(extraFiles)) {
     mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
     writeFileSync(path.join(root, relative), content);

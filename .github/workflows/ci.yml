@@ -70,6 +70,11 @@ jobs:
           mv "Godot_v${tag}_linux.x86_64" godot
           chmod +x godot
           rm "${zip}" SHA512-SUMS.txt
+      - name: Cache test framework archives
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/godotty-mcp/test-addons
+          key: test-addons-${{ hashFiles('scripts/fetch-test-addons.sh') }}
       - run: ${{ env.GODOT_PATH }} --version
       - run: npm ci
       - run: npm run test:integration

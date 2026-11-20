@@ -3,6 +3,7 @@ import { godotDocs } from './docs.js';
 import { listFiles, projectInfo, readScene } from './project.js';
 import type { ToolDefinition } from './registry.js';
 import { getOutput, runGame, stopGame } from './run.js';
+import { runTests } from './tests.js';
 
 /**
  * Every tool the server knows about, in the order clients list them.
@@ -18,4 +19,5 @@ export const ALL_TOOLS = [
   runGame,
   stopGame,
   getOutput,
+  runTests,
 ] as unknown as readonly ToolDefinition[];

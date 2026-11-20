@@ -7,6 +7,7 @@ import type { DocsStore } from '../godot/docs/docs-store.js';
 import type { GodotExecutable } from '../godot/executable.js';
 import type { GameManager } from '../godot/game.js';
 import type { ScriptChecker } from '../godot/script-checker.js';
+import type { TestRunner } from '../godot/tests/test-runner.js';
 import { formatError } from '../util/errors.js';
 import type { ProjectSandbox } from '../util/sandbox.js';
 
@@ -18,6 +19,7 @@ export interface ToolContext {
   game: GameManager;
   checker: ScriptChecker;
   docs: DocsStore;
+  tests: TestRunner;
 }
 
 /**

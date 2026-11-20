@@ -1,9 +1,9 @@
-import { cpSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DEMO_PROJECT } from '../helpers/demo.js';
+import { copyDemoProject } from '../helpers/demo.js';
 import { fakeGodot } from '../helpers/fake-godot.js';
 import { fakeSpawner } from '../helpers/fake-process.js';
 import { makeTempProject } from '../helpers/tmp-project.js';
@@ -15,10 +15,7 @@ describe('project tools', () => {
 
   beforeEach(async () => {
     project = makeTempProject();
-    cpSync(DEMO_PROJECT, project.root, {
-      recursive: true,
-      filter: (src) => !src.includes(`${path.sep}.godot`),
-    });
+    copyDemoProject(project.root);
     tools = await connectTools(project.root, fakeGodot().spawner);
   });
 
@@ -72,7 +69,7 @@ describe('project tools', () => {
   describe('list_files', () => {
     it('filters by type and glob', async () => {
       expect((await tools.call('list_files', { type: 'script' })).text).toBe(
-        '1 files (showing 1–1):\nres://scripts/player.gd',
+        '2 files (showing 1–2):\nres://scripts/player.gd\nres://test/unit/test_player.gd',
       );
       expect((await tools.call('list_files', { glob: '*.tscn' })).text).toContain(
         'res://scenes/player.tscn',

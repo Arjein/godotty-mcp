@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="GutTests" failures="2" tests="4" >
+  <testsuite name="test/unit/test_math.gd" tests="4" failures="2" skipped="1" time="0.000625" >
+      <testcase name="test_adds" assertions="1" status="pass" classname="test/unit/test_math.gd" time="0.000353" >
+      </testcase>
+      <testcase name="test_fails" assertions="1" status="fail" classname="test/unit/test_math.gd" time="0.000099" >
+      <failure message="failed"><![CDATA[[4] expected to equal [5]:  two times two
+            at line 9]]></failure></testcase>
+      <testcase name="test_pending" assertions="0" status="pending" classname="test/unit/test_math.gd" time="0.000048" >
+      <skipped message="pending"><![CDATA[not yet]]></skipped></testcase>
+      <testcase name="test_errors" assertions="1" status="fail" classname="test/unit/test_math.gd" time="0.000125" >
+      <failure message="failed"><![CDATA[Unexpected Errors:
+      [1] <engine-2>Cannot call method 'queue_free' on a null value.
+            at line -1]]></failure></testcase>
+  </testsuite>
+</testsuites>

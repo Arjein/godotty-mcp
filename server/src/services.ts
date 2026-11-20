@@ -7,6 +7,7 @@ import { GodotExecutable, type Spawner } from './godot/executable.js';
 import { GameManager } from './godot/game.js';
 import { findRuntimeSourceDir, RuntimeInjection } from './godot/runtime-injection.js';
 import { DEFAULT_EDITOR_LSP_PORT, ScriptChecker } from './godot/script-checker.js';
+import { TestRunner } from './godot/tests/test-runner.js';
 import type { ToolContext } from './tools/registry.js';
 import { ProjectSandbox } from './util/sandbox.js';
 
@@ -54,6 +55,7 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
     game,
     checker,
     docs,
+    tests: new TestRunner(godot, sandbox.root),
     dispose: () => {
       game.dispose();
       checker.dispose();

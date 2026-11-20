@@ -26,6 +26,9 @@ Known problems: `FLAGS.md`.
     the engine source at the release tag or build commit, cached), `lookup.ts` (class / member via
     ancestry / enum / ranked search), `bbcode.ts` (doc markup → Markdown, GDScript examples only).
     Bump `CACHE_FORMAT` whenever the cached JSON shape changes.
+  - `src/godot/tests/` `run_tests` backend: `test-runner.ts` (detect GUT/gdUnit4 by CLI entry
+    script, always `--import` first, run with the verified flags, collect parse errors of test
+    scripts) and `junit.ts` (both frameworks' JUnit dialects → `TestSuite`/`TestCase`).
   - `src/bridge/` WebSocket server for the editor plugin and runtime helper; protocol types live in
     one file (`protocol.ts`), versioned.
   - `src/util/` `errors.ts` (ToolError + codes), `sandbox.ts` (path resolution), `paginate.ts`.
@@ -36,11 +39,16 @@ Known problems: `FLAGS.md`.
   inert unless started with `-- --godotty-events=<file>` and writes JSON lines there (`ready`,
   `error`).
 - `examples/demo-project/` — small Godot 4 3D project (GL Compatibility renderer, so it renders under
-  Mesa/xvfb on CI) for demos and integration tests.
+  Mesa/xvfb on CI) for demos and integration tests. Its GUT tests (`test/unit/`) need GUT:
+  `scripts/fetch-test-addons.sh gut examples/demo-project` (addons/gut is gitignored).
+- `scripts/fetch-test-addons.sh <gut|gdunit4> <project> [minor]` installs pinned, SHA-256-checked
+  test frameworks (GUT release chosen per Godot minor); `scripts/gen-input-names.py` regenerates
+  `input-names.ts`.
 
 ## Commands (run from repo root)
 
-- `npm run lint` — ESLint (strict type-checked) + Prettier check + gdlint + gdformat check.
+- `npm run lint` — ESLint (strict type-checked) + Prettier check + gdlint + gdformat check (GDScript
+  lint covers `addon/` and the demo's `scripts/` and `test/` only, never third-party addons).
   gdtoolkit is installed via `pipx install 'gdtoolkit==4.*'` (binaries in `~/.local/bin`).
 - `npm run typecheck` · `npm test` · `npm run coverage` (thresholds in `server/vitest.config.ts`).
 - `GODOT_PATH=/opt/homebrew/bin/godot npm run test:integration` — real Godot against a temp copy
@@ -65,6 +73,8 @@ Known problems: `FLAGS.md`.
   run) before relying on them. Dev machine: Godot 4.7.2 at `/opt/homebrew/bin/godot`. Minimum
   supported: 4.5.
 - Commit `*.uid` files Godot generates next to scripts; never commit `.godot/`.
+- Copy the demo project in tests with `copyDemoProject` (skips `.godot` and locally installed test
+  addons); integration tests install frameworks with `installTestAddon`.
 - Tests fake Godot with `test/helpers/fake-godot.ts` (scripted processes) and
   `test/helpers/fake-lsp.ts` (TCP language server); tool tests go through a real MCP client
   (`test/helpers/tool-client.ts`).

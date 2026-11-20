@@ -44,3 +44,23 @@ script_backtraces: Array[ScriptBacktrace])`, `_log_message(message, error)`;
 - ConfigFile merges repeated sections, so appending our `[autoload]` keeps a user's
   `override.cfg` settings.
 - The editor also reads `override.cfg` at startup, so it must exist only while a launch starts.
+
+## Test frameworks (GUT 9.7.1, gdUnit4 6.2.3)
+
+- GUT ships one release per Godot minor (9.5.0 → 4.5, 9.6.1 → 4.6, 9.7.1 → 4.7); gdUnit4 6.2.x
+  covers 4.5–4.7. Pinned with SHA-256 in `scripts/fetch-test-addons.sh`.
+- Both need an imported project (global class cache). On an unimported project GUT prints
+  "Some GUT class_names have not been imported" and **exits 0 without writing results** — always
+  run `--headless --import` first and treat a missing results file as failure.
+- GUT: `-s res://addons/gut/gut_cmdln.gd -gexit -gjunit_xml_file=<abs> -gdir=<dir>
+-ginclude_subdirs | -gtest=<file> [-gunit_test_name=<substr>]`; reads `res://.gutconfig.json`
+  when present. Exit 1 on failures. JUnit `classname` = script path without `res://`; failures say
+  `at line N` (`-1` for unexpected engine errors, reported as failures "Unexpected Errors:");
+  pending → `<skipped>`; the name filter omits non-matching tests from the XML.
+- gdUnit4: `-s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a <dir|file> -c --ignoreHeadlessMode
+-rd <dir>` → `<dir>/report_N/results.xml`. **Fail-fast by default: without `-c` it stops after
+  the first failing test** and omits the rest (suite `tests` attribute still counts them). Exit
+  100 on failures. Runtime errors → `<error type="ABORT">`; messages contain `res://file.gd:line`.
+  No CLI filter by test name (only `-i` ignore lists).
+- A test script with a parse error is silently skipped by both; the only trace is a
+  `SCRIPT ERROR: Parse Error:` block in the run output.

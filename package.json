@@ -17,8 +17,8 @@
     "coverage": "npm run coverage -w server",
     "lint": "npm run lint:ts && npm run lint:gd",
     "lint:ts": "eslint . && prettier --check .",
-    "lint:gd": "gdlint addon examples/demo-project && gdformat --check addon examples/demo-project",
-    "format": "prettier --write . && gdformat addon examples/demo-project",
+    "lint:gd": "gdlint addon examples/demo-project/scripts examples/demo-project/test && gdformat --check addon examples/demo-project/scripts examples/demo-project/test",
+    "format": "prettier --write . && gdformat addon examples/demo-project/scripts examples/demo-project/test",
     "test:integration": "npm run test:integration -w server"
   },
   "devDependencies": {

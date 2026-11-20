@@ -12,6 +12,8 @@ export interface FakeGodotBehavior {
   onCheckOnly?: (resPath: string) => string;
   /** Called for `--headless --editor --lsp-port <port>`. */
   onEditor?: (proc: FakeProcess, port: number) => void;
+  /** Called for `-s <script>` runs (test frameworks). Must exit the process. */
+  onScript?: (proc: FakeProcess, script: string, call: SpawnCall) => void;
 }
 
 /** Writes runtime-helper records exactly as godotty_runtime.gd would. */
@@ -58,6 +60,15 @@ export function fakeGodot(behavior: FakeGodotBehavior = {}): ReturnType<typeof f
     if (args.includes('--doctool')) {
       writeDoctoolOutput(args[args.indexOf('--doctool') + 1] ?? '');
       proc.exit(0);
+      return;
+    }
+    if (args.includes('--import')) {
+      proc.exit(0);
+      return;
+    }
+    if (args.includes('-s') && !args.includes('--check-only')) {
+      if (behavior.onScript === undefined) proc.exit(0);
+      else behavior.onScript(proc, args[args.indexOf('-s') + 1] ?? '', call);
       return;
     }
     if (args.includes('--check-only')) {
