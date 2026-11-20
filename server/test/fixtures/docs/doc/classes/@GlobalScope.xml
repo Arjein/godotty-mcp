@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="@GlobalScope" api_type="core">
+	<brief_description>
+		Global scope constants and functions.
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="lerp">
+			<return type="Variant" />
+			<param index="0" name="from" type="Variant" />
+			<param index="1" name="to" type="Variant" />
+			<param index="2" name="weight" type="Variant" />
+			<description>
+				Linearly interpolates between two values.
+			</description>
+		</method>
+		<method name="print" qualifiers="vararg">
+			<return type="void" />
+			<description>
+				Prints one or more arguments.
+			</description>
+		</method>
+	</methods>
+</class>

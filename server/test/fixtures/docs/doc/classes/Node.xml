@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Node" inherits="Object" api_type="core">
+	<brief_description>
+		Base class for all scene objects.
+	</brief_description>
+	<description>
+		Nodes are Godot's building blocks. A tree of nodes is called a [i]scene[/i].
+	</description>
+	<tutorials>
+		<link title="Nodes and scenes">$DOCS_URL/getting_started/step_by_step/nodes_and_scenes.html</link>
+		<link title="T2">https://example.com/2</link>
+		<link title="T3">https://example.com/3</link>
+		<link title="T4">https://example.com/4</link>
+	</tutorials>
+	<methods>
+		<method name="add_child">
+			<return type="void" />
+			<param index="1" name="force_readable_name" type="bool" default="false" />
+			<param index="0" name="node" type="Node" />
+			<param index="2" name="internal" type="int" enum="Node.InternalMode" default="0" />
+			<description>
+				Adds a child [param node]. See [method remove_child].
+				[codeblocks]
+				[gdscript]
+				var child = Node.new()
+				add_child(child)
+				[/gdscript]
+				[csharp]
+				AddChild(new Node());
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_child" qualifiers="const">
+			<return type="Node" />
+			<param index="0" name="idx" type="int" />
+			<description>
+				Returns a child node by its index.
+			</description>
+		</method>
+		<method name="print_tree_old" deprecated="Use print_tree.">
+			<return type="void" />
+			<description>
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="name" type="StringName" setter="set_name" getter="get_name">
+			The name of the node.
+		</member>
+		<member name="process_mode" type="int" setter="set_process_mode" getter="get_process_mode" enum="Node.ProcessMode" default="0">
+			The node's processing behavior.
+		</member>
+	</members>
+	<signals>
+		<signal name="ready">
+			<description>
+				Emitted when the node is ready.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="NOTIFICATION_READY" value="13">
+			Notification received when the node is ready.
+		</constant>
+		<constant name="PROCESS_MODE_INHERIT" value="0" enum="ProcessMode">
+			Inherits [member process_mode] from the node's parent.
+		</constant>
+		<constant name="PROCESS_MODE_ALWAYS" value="3" enum="ProcessMode">
+			Always processes.
+		</constant>
+	</constants>
+</class>

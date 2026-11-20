@@ -6,7 +6,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
+import type { ServerConfig } from '../../src/config.js';
 import { createServer, type CreatedServer } from '../../src/server.js';
+import type { Services } from '../../src/services.js';
 import { DEMO_PROJECT } from '../helpers/demo.js';
 
 export const GODOT = process.env.GODOT_PATH ?? 'godot';
@@ -57,6 +59,30 @@ export async function startHarness(extraFiles: Record<string, string> = {}): Pro
       server.services.dispose();
       await client.close();
       rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+/** Serves `services` to an in-memory client (no project copy). */
+export async function connectServices(
+  config: ServerConfig,
+  services: Services,
+): Promise<{ call: Harness['call']; close: () => Promise<void> }> {
+  const server = createServer(config, undefined, services);
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: 'integration', version: '0.0.0' });
+  await Promise.all([server.server.connect(serverSide), client.connect(clientSide)]);
+  return {
+    call: async (name, args = {}) => {
+      const result = (await client.callTool({ name, arguments: args })) as CallToolResult;
+      const text = result.content
+        .map((c) => (c.type === 'text' ? c.text : `[${c.type}]`))
+        .join('\n');
+      return { text, isError: result.isError === true };
+    },
+    close: async () => {
+      services.dispose();
+      await client.close();
     },
   };
 }

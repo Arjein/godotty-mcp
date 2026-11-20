@@ -3,6 +3,7 @@ import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/
 import { z } from 'zod';
 
 import type { ServerConfig } from '../config.js';
+import type { DocsStore } from '../godot/docs/docs-store.js';
 import type { GodotExecutable } from '../godot/executable.js';
 import type { GameManager } from '../godot/game.js';
 import type { ScriptChecker } from '../godot/script-checker.js';
@@ -16,6 +17,7 @@ export interface ToolContext {
   godot: GodotExecutable;
   game: GameManager;
   checker: ScriptChecker;
+  docs: DocsStore;
 }
 
 /**

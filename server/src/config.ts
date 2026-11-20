@@ -14,6 +14,8 @@ export interface ServerConfig {
   allowEval: boolean;
   /** Port of the Godot editor's GDScript language server (editor setting; default 6005). */
   editorLspPort?: number | undefined;
+  /** Never use the network (docs show signatures only). */
+  offline?: boolean | undefined;
 }
 
 export const ENV = {
@@ -21,6 +23,7 @@ export const ENV = {
   godot: 'GODOT_PATH',
   allowEval: 'GODOTTY_ALLOW_EVAL',
   lspPort: 'GODOT_LSP_PORT',
+  offline: 'GODOTTY_OFFLINE',
 } as const;
 
 const DEFAULT_GODOT = 'godot';
@@ -31,6 +34,7 @@ export const USAGE = `Usage: godotty-mcp [--project <dir>] [--godot <executable>
   --project <dir>    Godot project root (env ${ENV.project}; default: current directory)
   --godot <path>     Godot 4 executable (env ${ENV.godot}; default: "godot" on PATH)
   --lsp-port <port>  Editor GDScript language server port (env ${ENV.lspPort}; default 6005)
+  --offline          Never use the network; docs show signatures only (env ${ENV.offline}=1)
   --allow-eval       Enable eval_gdscript, which runs arbitrary GDScript (env ${ENV.allowEval}=1)
   --help             Show this help`;
 
@@ -53,6 +57,7 @@ export function loadConfig(
       godot: { type: 'string' },
       'lsp-port': { type: 'string' },
       'allow-eval': { type: 'boolean' },
+      offline: { type: 'boolean' },
       help: { type: 'boolean' },
     },
     strict: true,
@@ -68,6 +73,7 @@ export function loadConfig(
     godotPath: values.godot ?? env[ENV.godot] ?? DEFAULT_GODOT,
     allowEval: values['allow-eval'] === true || isTruthy(env[ENV.allowEval]),
     ...(lspPort === undefined ? {} : { editorLspPort: parsePort(lspPort) }),
+    ...(values.offline === true || isTruthy(env[ENV.offline]) ? { offline: true } : {}),
   };
 }
 

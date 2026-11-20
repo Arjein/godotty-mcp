@@ -1,6 +1,7 @@
 import { appendFileSync } from 'node:fs';
 
 import { EVENTS_ARG } from '../../src/godot/game.js';
+import { writeDoctoolOutput } from './fake-docs.js';
 import { fakeSpawner, type FakeProcess, type SpawnCall } from './fake-process.js';
 
 export interface FakeGodotBehavior {
@@ -51,6 +52,11 @@ export function fakeGodot(behavior: FakeGodotBehavior = {}): ReturnType<typeof f
     const args = call.args;
     if (args.includes('--version')) {
       proc.stdout.write(`${behavior.version ?? '4.7.2.stable.official.ed1daf0bf'}\n`);
+      proc.exit(0);
+      return;
+    }
+    if (args.includes('--doctool')) {
+      writeDoctoolOutput(args[args.indexOf('--doctool') + 1] ?? '');
       proc.exit(0);
       return;
     }

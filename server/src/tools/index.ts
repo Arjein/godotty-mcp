@@ -1,4 +1,5 @@
 import { checkScripts, getErrors } from './diagnostics.js';
+import { godotDocs } from './docs.js';
 import { listFiles, projectInfo, readScene } from './project.js';
 import type { ToolDefinition } from './registry.js';
 import { getOutput, runGame, stopGame } from './run.js';
@@ -11,6 +12,7 @@ export const ALL_TOOLS = [
   projectInfo,
   listFiles,
   readScene,
+  godotDocs,
   checkScripts,
   getErrors,
   runGame,

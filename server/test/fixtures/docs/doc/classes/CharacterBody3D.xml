@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="CharacterBody3D" inherits="Node3D" api_type="core" experimental="">
+	<brief_description>
+		A 3D physics body specialized for characters moved by script.
+	</brief_description>
+	<description>
+		Uses [method move_and_slide]. See [url=$DOCS_URL/tutorials/physics.html]Physics[/url].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="move_and_slide">
+			<return type="bool" />
+			<description>
+				Moves the body based on [member velocity]. Returns [code]true[/code] if it collided.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="velocity" type="Vector3" setter="set_velocity" getter="get_velocity" default="Vector3(0, 0, 0)">
+			Current velocity vector.
+		</member>
+	</members>
+</class>

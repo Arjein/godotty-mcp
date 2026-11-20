@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Vector3" api_type="core">
+	<brief_description>
+		A 3D vector using floating-point coordinates.
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<constructors>
+		<constructor name="Vector3">
+			<return type="Vector3" />
+			<description>
+				Constructs a default-initialized Vector3.
+			</description>
+		</constructor>
+		<constructor name="Vector3">
+			<return type="Vector3" />
+			<param index="0" name="x" type="float" />
+			<param index="1" name="y" type="float" />
+			<param index="2" name="z" type="float" />
+			<description>
+				Returns a Vector3 with the given components.
+			</description>
+		</constructor>
+	</constructors>
+	<operators>
+		<operator name="operator +">
+			<return type="Vector3" />
+			<param index="0" name="right" type="Vector3" />
+			<description>
+				Adds each component.
+			</description>
+		</operator>
+	</operators>
+	<constants>
+		<constant name="ZERO" value="Vector3(0, 0, 0)">
+			Zero vector.
+		</constant>
+	</constants>
+</class>

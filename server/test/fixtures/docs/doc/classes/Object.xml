@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Object" api_type="core">
+	<brief_description>
+		Base class for all other classes in the engine.
+	</brief_description>
+	<description>
+		An advanced [Variant] type.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="free">
+			<return type="void" />
+			<description>
+				Deletes the object from memory.
+			</description>
+		</method>
+	</methods>
+</class>

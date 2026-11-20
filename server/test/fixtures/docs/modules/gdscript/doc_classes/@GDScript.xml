@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="@GDScript" api_type="core">
+	<brief_description>
+		Built-in GDScript constants, functions, and annotations.
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<annotations>
+		<annotation name="@export_range" qualifiers="vararg">
+			<return type="void" />
+			<param index="0" name="min" type="float" />
+			<param index="1" name="max" type="float" />
+			<description>
+				Export an [int] or [float] property as a range value.
+			</description>
+		</annotation>
+	</annotations>
+</class>
