@@ -63,6 +63,22 @@ func test_hold_lasts_about_the_requested_time() -> void:
 	assert_false(Input.is_action_pressed("move_right"), "released after the hold")
 
 
+func test_hold_survives_input_released_by_a_focus_change() -> void:
+	# Godot releases every pressed input when the game window gains or loses focus.
+	var held: Array[bool] = [false]
+	var step: Dictionary = {
+		"type": "action", "action": "move_right", "mode": "hold", "duration_ms": HOLD_MS
+	}
+	var check: Callable = func() -> void:
+		await wait_seconds(HOLD_MS / 4000.0)
+		Input.action_release("move_right")
+		await wait_seconds(HOLD_MS / 2000.0)
+		held[0] = Input.is_action_pressed("move_right")
+	check.call()
+	await _input.perform(step)
+	assert_true(held[0], "the hold is pressed again after an outside release")
+
+
 func test_tap_presses_then_releases() -> void:
 	await _input.perform({"type": "action", "action": "move_right"})
 	await _flush()

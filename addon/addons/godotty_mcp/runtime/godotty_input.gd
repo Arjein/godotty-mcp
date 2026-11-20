@@ -75,9 +75,34 @@ func _press_release(step: Dictionary, make_event: Callable) -> void:
 		for i: int in frames:
 			await _host.get_tree().physics_frame
 	elif mode == "hold":
-		await _sleep_ms(int(step.get("duration_ms", DEFAULT_HOLD_MS)))
+		await _hold(step, make_event, int(step.get("duration_ms", DEFAULT_HOLD_MS)))
 	if mode != "press":
 		Input.parse_input_event(make_event.call(false))
+
+
+## Keeps the input pressed for `ms`. Godot releases all pressed input when the window gains or
+## loses focus (a new game window does both), so a hold presses again whenever that happened.
+func _hold(step: Dictionary, make_event: Callable, ms: int) -> void:
+	var deadline: int = Time.get_ticks_msec() + ms
+	while Time.get_ticks_msec() < deadline:
+		await _host.get_tree().physics_frame
+		if Time.get_ticks_msec() < deadline and not _is_held(step):
+			Input.parse_input_event(make_event.call(true))
+
+
+func _is_held(step: Dictionary) -> bool:
+	match str(step["type"]):
+		"action":
+			return Input.is_action_pressed(StringName(str(step["action"])))
+		"key":
+			return Input.is_physical_key_pressed(OS.find_keycode_from_string(str(step["key"])))
+		"mouse_button":
+			var button: MouseButton = MOUSE_BUTTONS[str(step["button"])]
+			# Wheel "buttons" never stay pressed; pressing them again would scroll each frame.
+			if button in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+				return true
+			return Input.is_mouse_button_pressed(button)
+	return true
 
 
 func _action_event(pressed: bool, step: Dictionary) -> InputEvent:
