@@ -13,7 +13,9 @@ Releases are published by a maintainer by hand; nothing publishes automatically.
    README, LICENSE, CHANGELOG and no source maps or tests. (`prepack` builds and copies the addon
    and docs into `server/`; those copies are gitignored.)
 5. **Publish to npm.** `npm publish -w server` (add `--access public` the first time; consider
-   `--provenance` from CI).
+   `--provenance` from CI). npm requires 2FA to publish; with a security key the approval happens
+   in the browser, so run it in an interactive terminal (a non-TTY shell fails with `EOTP`). npm
+   stages new versions: `latest` can lag for a few minutes (`npm view godotty-mcp dist-tags`).
 6. **Addon archive.** `scripts/package-addon.sh` → `release/godotty_mcp-<version>.zip`.
 7. **Tag and GitHub release.** `git tag v<version> && git push origin v<version>`, then create a
    GitHub release from the tag with the changelog section and attach the addon zip.

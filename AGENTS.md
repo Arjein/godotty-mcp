@@ -57,6 +57,8 @@ Known problems: `FLAGS.md`.
   (gitignored). The installed package finds its addon via `findAddonDir`. `godotty-mcp
 install-addon` copies it into a project; `scripts/package-addon.sh` builds the release zip.
   Release steps: `docs/RELEASING.md`. Versions in `server/package.json` and `plugin.cfg` must match.
+- `docs/media/` holds the logo and banner. README images use absolute `raw.githubusercontent.com`
+  URLs because the README is also the npm page, where relative paths don't resolve.
 - `scripts/fetch-test-addons.sh <gut|gdunit4> <project> [minor]` installs pinned, SHA-256-checked
   test frameworks (GUT release chosen per Godot minor); `scripts/gen-input-names.py` regenerates
   `input-names.ts`.
