@@ -44,7 +44,8 @@ export class HelpRequested extends Error {}
 
 /**
  * Builds the config from argv (without the node/script prefix) and env.
- * Flags win over env vars; the project folder must contain project.godot.
+ * Flags win over env vars. The project folder must exist, but project.godot may be created later:
+ * the server starts anyway and project tools say what is missing (see `projectFileProblem`).
  */
 export function loadConfig(
   argv: readonly string[],
@@ -67,7 +68,7 @@ export function loadConfig(
     throw new HelpRequested();
   }
   const projectPath = path.resolve(cwd, values.project ?? env[ENV.project] ?? '.');
-  assertGodotProject(projectPath);
+  assertProjectFolder(projectPath);
   const lspPort = values['lsp-port'] ?? env[ENV.lspPort];
   return {
     projectPath,
@@ -92,15 +93,30 @@ function parsePort(value: string): number {
   return port;
 }
 
-function assertGodotProject(projectPath: string): void {
-  const isDir = existsSync(projectPath) && statSync(projectPath).isDirectory();
-  if (!isDir || !existsSync(path.join(projectPath, PROJECT_FILE))) {
+function assertProjectFolder(projectPath: string): void {
+  if (!existsSync(projectPath) || !statSync(projectPath).isDirectory()) {
     throw new ToolError(
       ErrorCode.NotFound,
-      `No ${PROJECT_FILE} found in "${projectPath}".`,
+      `Project folder "${projectPath}" does not exist.`,
       `Pass --project <dir> or set ${ENV.project} to your Godot project root.`,
     );
   }
+}
+
+/** Whether the project folder has its project.godot yet. */
+export function hasProjectFile(projectPath: string): boolean {
+  return existsSync(path.join(projectPath, PROJECT_FILE));
+}
+
+/** The error project tools return while project.godot is missing. */
+export function missingProjectError(projectPath: string): ToolError {
+  return new ToolError(
+    ErrorCode.NotFound,
+    `No ${PROJECT_FILE} in "${projectPath}" yet.`,
+    `Create the Godot project there (the Godot project manager, or a minimal ${PROJECT_FILE} with ` +
+      'config_version=5), then call again; the server picks it up without a restart. godot_docs ' +
+      'works without a project.',
+  );
 }
 
 function isTruthy(value: string | undefined): boolean {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-import { HelpRequested, loadConfig, USAGE } from './config.js';
+import { hasProjectFile, HelpRequested, loadConfig, USAGE } from './config.js';
 import { INSTALL_COMMAND, runInstallCommand } from './install-addon.js';
 import { createServer } from './server.js';
 import { formatError } from './util/errors.js';
@@ -26,8 +26,11 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown);
   await services.start();
   await server.connect(new StdioServerTransport());
+  const waiting = hasProjectFile(config.projectPath)
+    ? ''
+    : '; no project.godot yet, project tools report NOT_FOUND until it exists';
   console.error(
-    `godotty-mcp: serving ${config.projectPath} (${registeredTools.length} tools, godot: ${config.godotPath})`,
+    `godotty-mcp: serving ${config.projectPath} (${registeredTools.length} tools, godot: ${config.godotPath}${waiting})`,
   );
 }
 

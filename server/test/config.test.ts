@@ -1,6 +1,9 @@
+import { rmSync } from 'node:fs';
+import path from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ENV, HelpRequested, loadConfig } from '../src/config.js';
+import { ENV, hasProjectFile, HelpRequested, loadConfig } from '../src/config.js';
 import { makeTempProject } from './helpers/tmp-project.js';
 
 describe('loadConfig', () => {
@@ -48,10 +51,12 @@ describe('loadConfig', () => {
     expect(loadConfig([], { [ENV.allowEval]: 'nope' }, project.root).allowEval).toBe(false);
   });
 
-  it('rejects folders without project.godot with an actionable hint', () => {
-    expect(() => loadConfig(['--project', '/'], {}, '/')).toThrow(/No project.godot/);
+  it('accepts a folder without project.godot (it may be created later), but not a missing folder', () => {
+    rmSync(path.join(project.root, 'project.godot'));
+    expect(loadConfig(['--project', project.root], {}, '/').projectPath).toBe(project.root);
+    expect(hasProjectFile(project.root)).toBe(false);
     expect(() => loadConfig(['--project', '/definitely/missing'], {}, '/')).toThrow(
-      /No project.godot/,
+      /does not exist/,
     );
   });
 

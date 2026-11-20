@@ -23,6 +23,8 @@ export interface ToolContext {
   tests: TestRunner;
   runtime: RuntimeClient;
   editor: EditorClient;
+  /** Throws NOT_FOUND while project.godot is missing (the server starts without one). */
+  requireProject: () => void;
 }
 
 /**
@@ -36,6 +38,8 @@ export interface ToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
   description: string;
   inputSchema: Shape;
   annotations?: ToolAnnotations;
+  /** False for tools that work without project.godot (docs). Defaults to true. */
+  needsProject?: boolean;
   /** Return false to leave the tool unregistered (e.g. opt-in tools). Defaults to enabled. */
   enabled?: (config: ServerConfig) => boolean;
   handler: (args: z.infer<z.ZodObject<Shape>>, ctx: ToolContext) => Promise<CallToolResult>;
@@ -63,6 +67,7 @@ export async function runHandler<Shape extends z.ZodRawShape>(
   ctx: ToolContext,
 ): Promise<CallToolResult> {
   try {
+    if (tool.needsProject !== false) ctx.requireProject();
     return await tool.handler(args, ctx);
   } catch (error) {
     return { content: [{ type: 'text', text: formatError(error) }], isError: true };

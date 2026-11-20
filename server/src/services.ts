@@ -4,7 +4,7 @@ import path from 'node:path';
 import { BridgeServer } from './bridge/bridge-server.js';
 import { editorClient, runtimeClient } from './bridge/runtime-client.js';
 import { removeSessionFile, writeSessionFile } from './bridge/session-file.js';
-import type { ServerConfig } from './config.js';
+import { hasProjectFile, missingProjectError, type ServerConfig } from './config.js';
 import { DocsStore, httpFetchText, type TextFetcher } from './godot/docs/docs-store.js';
 import { GodotExecutable, type Spawner } from './godot/executable.js';
 import { GameManager } from './godot/game.js';
@@ -17,7 +17,10 @@ import { SERVER_VERSION } from './version.js';
 
 export interface Services extends ToolContext {
   bridge: BridgeServer;
-  /** Starts the bridge and publishes the session file for the editor plugin. */
+  /**
+   * Starts the bridge and publishes the session file for the editor plugin (once project.godot
+   * exists; a later project tool call publishes it if the project is created afterwards).
+   */
   start: () => Promise<void>;
   /** Stops child processes and restores the project; call on shutdown. */
   dispose: () => void;
@@ -63,6 +66,19 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
     fetchText: options.fetchText ?? httpFetchText,
     offline: config.offline === true,
   });
+  let bridgePort: number | undefined;
+  let sessionWritten = false;
+  const publishSession = (): void => {
+    if (sessionWritten || bridgePort === undefined || !hasProjectFile(sandbox.root)) return;
+    writeSessionFile(
+      sandbox.root,
+      bridgePort,
+      bridge.tokenFor('editor'),
+      SERVER_VERSION,
+      config.allowEval,
+    );
+    sessionWritten = true;
+  };
   return {
     config,
     sandbox,
@@ -74,14 +90,13 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
     runtime: runtimeClient(bridge, game),
     editor: editorClient(bridge),
     bridge,
+    requireProject: () => {
+      if (!hasProjectFile(sandbox.root)) throw missingProjectError(sandbox.root);
+      publishSession();
+    },
     start: async () => {
-      writeSessionFile(
-        sandbox.root,
-        await bridge.listen(),
-        bridge.tokenFor('editor'),
-        SERVER_VERSION,
-        config.allowEval,
-      );
+      bridgePort = await bridge.listen();
+      publishSession();
     },
     dispose: () => {
       removeSessionFile(sandbox.root);

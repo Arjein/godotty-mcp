@@ -42,6 +42,7 @@ const NO_TEXT_NOTE =
 
 export const godotDocs = defineTool({
   name: 'godot_docs',
+  needsProject: false,
   title: 'Godot docs',
   description:
     'Looks up the class reference of the INSTALLED Godot version (exact signatures from your Godot binary; ' +
