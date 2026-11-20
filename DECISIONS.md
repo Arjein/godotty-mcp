@@ -33,4 +33,11 @@
   isn't connected — tool-list change notifications aren't reliable across clients. Edits apply to
   the scene currently open in the editor; `undo`/`redo` exist on the bridge (used by tests) but are
   not exposed as tools yet.
+- [2026-11-20] M7 security review (independent agent) findings fixed: Resource/Object literals,
+  server authentication (HMAC welcome proof), per-role tokens, ReDoS (substring filter instead of
+  agent regex, glob limits, line caps), quadratic/exponential parsing, symlinked state dir, pre-auth
+  limits, output caps, reserved game args. Accepted and documented in docs/SECURITY.md: running or
+  testing a project runs its code; the editor LSP port is trusted.
+- [2026-11-20] `get_output` filters with a case-insensitive substring (`contains`) rather than a
+  regex, so agent input never reaches the regex engine.
 - [2026-11-20] TypeScript pinned to 6.0.x (typescript-eslint 8.x supports `<6.1`).

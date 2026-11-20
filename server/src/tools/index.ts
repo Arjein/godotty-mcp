@@ -1,6 +1,7 @@
 import { checkScripts, getErrors } from './diagnostics.js';
 import { godotDocs } from './docs.js';
 import { addNode, openScene, removeNode, saveScene, updateNode } from './editor.js';
+import { evalGdscript } from './eval.js';
 import { listFiles, projectInfo, readScene } from './project.js';
 import type { ToolDefinition } from './registry.js';
 import { getOutput, runGame, stopGame } from './run.js';
@@ -46,4 +47,6 @@ export const ALL_TOOLS = [
   saveScene,
   // Tests
   runTests,
+  // Opt-in (--allow-eval)
+  evalGdscript,
 ] as unknown as readonly ToolDefinition[];

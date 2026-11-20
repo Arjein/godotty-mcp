@@ -59,7 +59,7 @@ describe('editor tools', () => {
     editor = new FakeRuntime(HANDLERS);
     await editor.connect(await tools.services.bridge.listen(), {
       role: 'editor',
-      token: tools.services.bridge.token,
+      token: tools.services.bridge.tokenFor('editor'),
     });
   });
 

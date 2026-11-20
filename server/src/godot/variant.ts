@@ -43,6 +43,18 @@ const ESCAPES: Readonly<Record<string, string>> = {
 };
 const HEX = 16;
 const ERROR_SNIPPET_CHARS = 20;
+/** Deeper nesting is refused (hostile files would otherwise exhaust the stack). */
+const MAX_DEPTH = 64;
+
+/** Assigns without invoking setters such as __proto__. */
+function setOwn(target: Record<string, GdValue>, key: string, value: GdValue): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+}
 const UNICODE_ESCAPE_LENGTH = 4;
 
 /** Parses one complete Variant value; throws VariantParseError on malformed or trailing input. */
@@ -91,7 +103,18 @@ class Parser {
     }
   }
 
+  private depth = 0;
+
   public value(): GdValue {
+    if (++this.depth > MAX_DEPTH) throw this.error('Nesting is too deep');
+    try {
+      return this.valueInner();
+    } finally {
+      this.depth--;
+    }
+  }
+
+  private valueInner(): GdValue {
     this.skipSpace();
     const c = this.peek();
     if (c === '"') return this.string();
@@ -212,7 +235,7 @@ class Parser {
     while (this.accept(',')) {
       const key = this.string();
       this.expect(':');
-      props[key] = this.value();
+      setOwn(props, key, this.value());
     }
     this.expect(')');
     return { kind: 'object', className, props };
@@ -242,7 +265,7 @@ class Parser {
       if (this.accept('}')) return { kind: 'dict', entries };
       const key = this.value();
       this.expect(':');
-      entries[typeof key === 'string' ? key : formatVariant(key)] = this.value();
+      setOwn(entries, typeof key === 'string' ? key : formatVariant(key), this.value());
     } while (this.accept(','));
     this.expect('}');
     return { kind: 'dict', entries };

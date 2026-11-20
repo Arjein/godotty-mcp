@@ -28,7 +28,7 @@ describe('RuntimeClient', () => {
       screenshot: () => ({ error: { code: 'HEADLESS', message: 'headless' } }),
       get_props: () => ({ error: { code: 'MYSTERY', message: 'odd' } }),
     });
-    await peer.connect(await bridge.listen(), { token: bridge.token });
+    await peer.connect(await bridge.listen(), { token: bridge.tokenFor('runtime') });
   });
 
   afterEach(() => {

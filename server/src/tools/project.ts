@@ -111,11 +111,9 @@ export const listFiles = defineTool({
   name: 'list_files',
   title: 'List project files',
   description:
-    'Lists project files as res:// paths, sorted, optionally filtered by type and glob. Skips .godot, ' +
-    'hidden and .gdignore folders, generated .import/.uid files, and addons/ unless include_addons is true. ' +
-    `Types: ${Object.entries(FILE_TYPES)
-      .map(([k, v]) => `${k} (${v.join(' ')})`)
-      .join('; ')}. Paginated: pass the returned next offset to continue.`,
+    'Lists project files as res:// paths, sorted, optionally filtered by type (scene, script, resource, ' +
+    'shader, image, audio, model, font) and glob. Skips .godot, hidden and .gdignore folders, generated ' +
+    '.import/.uid files, and addons/ unless include_addons. Paginated: pass the returned offset to continue.',
   inputSchema: {
     type: z.enum(FILE_TYPE_NAMES).default('all').describe('File category to include.'),
     glob: z

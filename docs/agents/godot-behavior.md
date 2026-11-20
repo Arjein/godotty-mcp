@@ -97,3 +97,7 @@ RenderingServer.frame_post_draw`. **Headless never emits `frame_post_draw` — a
   node counts are higher than the `.tscn`'s `[node]` count.
 - `.tscn`-saving needs owners: nodes added by script must `set_owner(scene_root)` (instance roots
   only; their children stay owned by the instance) or they are not saved.
+- `OS.is_process_running(pid)` only knows Godot's own child processes (it is false even for
+  `OS.get_process_id()`), so it cannot tell whether an external process is alive.
+- `Crypto.hmac_digest(HashingContext.HASH_SHA256, key, msg)` matches Node's
+  `createHmac('sha256', key).update(msg)` (used for the bridge welcome proof).

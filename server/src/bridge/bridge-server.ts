@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, type Server, type Socket } from 'node:net';
 
 import { ErrorCode, ToolError } from '../util/errors.js';
@@ -15,16 +15,50 @@ import {
 const TOKEN_BYTES = 32;
 /** A connection that hasn't said a valid hello by then is dropped. */
 const HELLO_TIMEOUT_MS = 5_000;
+/** A hello is tiny; anything bigger before authentication is abuse. */
+const MAX_HELLO_BYTES = 16_384;
+/** Concurrent connections that have not authenticated yet. */
+const MAX_PENDING_CONNECTIONS = 8;
 const NEWLINE = 0x0a;
+
+/** Splits a byte stream into lines without re-copying the buffer on every chunk. */
+export class LineReader {
+  private parts: Buffer[] = [];
+  private size = 0;
+
+  /** Returns complete lines; throws when the pending (unterminated) data exceeds `limit`. */
+  public push(chunk: Buffer, limit: number): string[] {
+    const lines: string[] = [];
+    let start = 0;
+    for (let end = chunk.indexOf(NEWLINE); end !== -1; end = chunk.indexOf(NEWLINE, start)) {
+      this.parts.push(chunk.subarray(start, end));
+      lines.push(Buffer.concat(this.parts).toString('utf8'));
+      this.parts = [];
+      this.size = 0;
+      start = end + 1;
+    }
+    if (start < chunk.length) {
+      this.parts.push(chunk.subarray(start));
+      this.size += chunk.length - start;
+      if (this.size > limit) throw new Error('line too long');
+    }
+    return lines;
+  }
+}
+
+/** HMAC the server sends back so Godot knows it talks to the real server, not a port squatter. */
+export function welcomeProof(token: string, nonce: string): string {
+  return createHmac('sha256', token).update(nonce).digest('hex');
+}
 
 /** Why a first message is not an acceptable hello, or undefined if it is. */
 function helloProblem(
   message: unknown,
-  tokenMatches: (token: string) => boolean,
+  tokenMatches: (role: Role, token: string) => boolean,
 ): string | undefined {
   const hello = helloSchema.safeParse(message);
   if (!hello.success) return 'expected hello';
-  if (!tokenMatches(hello.data.token)) return 'invalid token';
+  if (!tokenMatches(hello.data.role, hello.data.token)) return 'invalid token';
   if (hello.data.protocol !== PROTOCOL_VERSION) {
     return `protocol ${hello.data.protocol} is not supported (server speaks ${PROTOCOL_VERSION}); update the Godotty addon/server so they match`;
   }
@@ -127,11 +161,17 @@ export class BridgeConnection {
 }
 
 /**
- * Loopback TCP server that Godot connects to. Only peers presenting this session's random token in
- * their first message are accepted; a newer connection for a role replaces the previous one.
+ * Loopback TCP server that Godot connects to. Each role has its own random token (the game gets
+ * the runtime token via its environment, the editor plugin the editor token via the session file),
+ * so a game can never pose as the editor. The server answers a valid hello with an HMAC of the
+ * peer's nonce, proving it knows the token. A newer connection for a role replaces the older one.
  */
 export class BridgeServer {
-  public readonly token = randomBytes(TOKEN_BYTES).toString('hex');
+  private readonly tokens: Readonly<Record<Role, string>> = {
+    runtime: randomBytes(TOKEN_BYTES).toString('hex'),
+    editor: randomBytes(TOKEN_BYTES).toString('hex'),
+  };
+  private pendingConnections = 0;
   private server: Server | undefined;
   private listening: Promise<number> | undefined;
   private readonly peers = new Map<Role, BridgeConnection>();
@@ -151,6 +191,11 @@ export class BridgeServer {
       });
     });
     return this.listening;
+  }
+
+  /** The secret a peer of `role` must present. */
+  public tokenFor(role: Role): string {
+    return this.tokens[role];
   }
 
   /** The connected peer for `role`, if any. */
@@ -186,7 +231,17 @@ export class BridgeServer {
   }
 
   private accept(socket: Socket): void {
-    let buffer = Buffer.alloc(0);
+    if (this.pendingConnections >= MAX_PENDING_CONNECTIONS) {
+      socket.destroy();
+      return;
+    }
+    this.pendingConnections++;
+    let pending = true;
+    const settle = (): void => {
+      if (pending) this.pendingConnections--;
+      pending = false;
+    };
+    const reader = new LineReader();
     let connection: BridgeConnection | undefined;
     const helloTimer = setTimeout(() => {
       socket.destroy();
@@ -196,16 +251,17 @@ export class BridgeServer {
     });
     socket.on('close', () => {
       clearTimeout(helloTimer);
+      settle();
     });
     socket.on('data', (chunk: Buffer) => {
-      buffer = Buffer.concat([buffer, chunk]);
-      if (buffer.length > MAX_MESSAGE_BYTES) {
+      let lines: string[];
+      try {
+        lines = reader.push(chunk, connection === undefined ? MAX_HELLO_BYTES : MAX_MESSAGE_BYTES);
+      } catch {
         socket.destroy();
         return;
       }
-      for (let end = buffer.indexOf(NEWLINE); end !== -1; end = buffer.indexOf(NEWLINE)) {
-        const line = buffer.subarray(0, end).toString('utf8');
-        buffer = buffer.subarray(end + 1);
+      for (const line of lines) {
         let message: unknown;
         try {
           message = JSON.parse(line);
@@ -220,19 +276,21 @@ export class BridgeServer {
         connection = this.authenticate(socket, message);
         if (connection === undefined) return;
         clearTimeout(helloTimer);
+        settle();
       }
     });
   }
 
   private authenticate(socket: Socket, message: unknown): BridgeConnection | undefined {
-    const problem = helloProblem(message, (token) => this.tokenMatches(token));
+    const problem = helloProblem(message, (role, token) => this.tokenMatches(role, token));
     if (problem !== undefined) {
       socket.end(`${JSON.stringify({ type: 'rejected', reason: problem })}\n`);
       socket.destroy();
       return undefined;
     }
     const hello = helloSchema.parse(message);
-    socket.write(`${JSON.stringify({ type: 'welcome', protocol: PROTOCOL_VERSION })}\n`);
+    const proof = welcomeProof(this.tokens[hello.role], hello.nonce);
+    socket.write(`${JSON.stringify({ type: 'welcome', protocol: PROTOCOL_VERSION, proof })}\n`);
     const connection = new BridgeConnection(socket, hello);
     this.peers.get(hello.role)?.close();
     this.peers.set(hello.role, connection);
@@ -241,8 +299,8 @@ export class BridgeServer {
     return connection;
   }
 
-  private tokenMatches(candidate: string): boolean {
-    const expected = Buffer.from(this.token);
+  private tokenMatches(role: Role, candidate: string): boolean {
+    const expected = Buffer.from(this.tokens[role]);
     const actual = Buffer.from(candidate);
     return actual.length === expected.length && timingSafeEqual(actual, expected);
   }

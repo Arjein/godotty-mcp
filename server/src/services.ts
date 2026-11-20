@@ -44,7 +44,13 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
   // Clean up after a previous server that crashed mid-launch.
   injection.recover();
   const bridge = new BridgeServer();
-  const game = new GameManager({ godot, projectRoot: sandbox.root, injection, bridge });
+  const game = new GameManager({
+    godot,
+    projectRoot: sandbox.root,
+    injection,
+    bridge,
+    allowEval: config.allowEval,
+  });
   const checker = new ScriptChecker({
     godot,
     projectRoot: sandbox.root,
@@ -69,7 +75,13 @@ export function createServices(config: ServerConfig, options: ServiceOptions = {
     editor: editorClient(bridge),
     bridge,
     start: async () => {
-      writeSessionFile(sandbox.root, await bridge.listen(), bridge.token, SERVER_VERSION);
+      writeSessionFile(
+        sandbox.root,
+        await bridge.listen(),
+        bridge.tokenFor('editor'),
+        SERVER_VERSION,
+        config.allowEval,
+      );
     },
     dispose: () => {
       removeSessionFile(sandbox.root);

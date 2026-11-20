@@ -106,7 +106,7 @@ describe('headless core against real Godot', () => {
       /WARNING res:\/\/scripts\/crash\.gd:6 in _ready\(\): integration warning/,
     );
 
-    const output = await h.call('get_output', { pattern: 'crash scene ready' });
+    const output = await h.call('get_output', { contains: 'crash scene ready' });
     expect(output.text).toMatch(/\d+ {2}\| crash scene ready/);
     const errorsOnly = await h.call('get_output', { filter: 'errors' });
     expect(errorsOnly.text).toContain('E| SCRIPT ERROR');

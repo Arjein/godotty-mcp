@@ -124,3 +124,30 @@ func test_screenshot_refuses_headless_instead_of_hanging() -> void:
 		return
 	var outcome: Dictionary = await _commands.run("screenshot", {"count": 1})
 	assert_eq(outcome["error"]["code"], "HEADLESS")
+
+
+func test_resource_and_object_literals_are_refused_without_eval() -> void:
+	var path: String = str(_hero.get_path())
+	for literal: String in ['Resource("res://x.gd")', "Object(Node)"]:
+		var params: Dictionary = {"path": path, "values": {"editor_description": literal}}
+		var outcome: Dictionary = await _commands.run("set_props", params)
+		assert_eq(outcome["error"]["code"], "INVALID_VALUE", literal)
+		assert_string_contains(outcome["error"]["message"], "not allowed")
+	var condition: Dictionary = {"node": path, "property": "visible", "value": "Object(Node)"}
+	var waited: Dictionary = await _commands.run("wait", {"until": condition, "timeout_s": 0.1})
+	assert_eq(waited["error"]["code"], "INVALID_VALUE")
+
+
+func test_eval_is_refused_unless_enabled() -> void:
+	var outcome: Dictionary = await _commands.run("eval", {"code": "return 1"})
+	assert_eq(outcome["error"]["code"], "EVAL_DISABLED")
+
+
+func test_eval_runs_code_when_enabled() -> void:
+	# Parse/runtime error reporting is covered by test/integration/eval.test.ts: GUT fails any test
+	# during which an engine error is logged.
+	_commands.eval_allowed = true
+	var params: Dictionary = {"code": "await tree.process_frame\nreturn 6 * 7"}
+	var ok: Dictionary = await _commands.run("eval", params)
+	assert_eq(ok["result"]["value"], "42")
+	assert_eq(ok["result"]["errors"], [])

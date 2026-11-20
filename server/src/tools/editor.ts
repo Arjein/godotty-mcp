@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type { EditResult, SceneInfo } from '../bridge/protocol.js';
 import { ErrorCode, ToolError } from '../util/errors.js';
+import { assertSafeLiterals } from '../util/literals.js';
 import { defineTool, textResult, type ToolContext } from './registry.js';
 
 const EDIT_TIMEOUT_MS = 15_000;
@@ -97,6 +98,7 @@ export const addNode = defineTool({
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (args, ctx) => {
+    assertSafeLiterals(Object.values(args.properties), ctx.config.allowEval);
     if ((args.type === undefined) === (args.scene === undefined)) {
       throw new ToolError(ErrorCode.InvalidInput, 'Pass exactly one of "type" or "scene".');
     }
@@ -143,6 +145,7 @@ export const updateNode = defineTool({
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (args, ctx) => {
+    assertSafeLiterals(Object.values(args.properties), ctx.config.allowEval);
     const script =
       args.script === undefined || args.script === ''
         ? args.script

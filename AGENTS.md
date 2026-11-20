@@ -101,4 +101,12 @@ Known problems: `FLAGS.md`.
 - Every Godot process the server spawns carries `GODOTTY_NO_EDITOR_BRIDGE=1` (set in
   `GodotExecutable.spawn`); the plugin stays offline there, so only the user's own editor is ever
   "the editor". `check_scripts` never starts a headless editor while that editor is connected.
+- Security invariants (see docs/SECURITY.md; regression tests in `server/test/security.test.ts`):
+  per-role bridge tokens + HMAC welcome proof (Godot ignores requests until verified); value
+  literals with `Resource(`/`Object(`/`ExtResource(`/`SubResource(` refused on both sides unless
+  eval is on (`util/literals.ts`, `_literal_problem`); state under `.godot/godotty_mcp` only via
+  `util/state-dir.ts` (no symlinks, 0700/0600, exclusive create); never compile agent-supplied
+  regexes; parsers keep depth limits and linear line handling; `--godotty-*` game args are reserved.
+- `eval_gdscript` is registered only with `--allow-eval`, and Godot refuses eval unless launched
+  with `--godotty-allow-eval` (game) or a session file with `allow_eval: true` (editor).
 - Every bug fix gets a regression test.

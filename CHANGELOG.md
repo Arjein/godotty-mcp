@@ -10,6 +10,9 @@ All notable changes to this project are documented here. The format follows
 
 - Project named **Godotty** (npm package `godotty-mcp`, addon `addons/godotty_mcp`).
 - Repository skeleton: MCP server package (TypeScript, stdio), editor addon stub, demo project, CI.
+- `eval_gdscript` (opt-in via `--allow-eval`): run GDScript in the game or editor, with parse and
+  runtime errors reported by line. Godot refuses eval unless the server enabled it.
+- Security hardening after an independent review; see docs/SECURITY.md (safety model and limits).
 - Godot editor plugin (`addons/godotty_mcp`) and editor tools: `open_scene` (or create),
   `add_node` (class or scene instance), `remove_node`, `update_node` (properties, rename, reparent,
   script), `save_scene` — each one undoable step in the editor. `inspect_scene_tree` and

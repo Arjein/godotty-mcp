@@ -1,12 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
-import { STATE_DIR } from '../godot/runtime-injection.js';
+import { ensureStateDir, STATE_DIR, writePrivateFile } from '../util/state-dir.js';
 import { PROTOCOL_VERSION, type SessionFile } from './protocol.js';
 
 const SESSION_FILE = 'session.json';
-/** Owner read/write only: the file holds the bridge token. */
-const PRIVATE_FILE_MODE = 0o600;
 
 export function sessionFilePath(projectRoot: string): string {
   return path.join(projectRoot, STATE_DIR, SESSION_FILE);
@@ -18,17 +16,19 @@ export function writeSessionFile(
   port: number,
   token: string,
   serverVersion: string,
+  allowEval = false,
 ): void {
-  const file = sessionFilePath(projectRoot);
-  mkdirSync(path.dirname(file), { recursive: true });
+  // Owner-only, never through a symlink: the file holds the editor's bridge token.
+  const file = path.join(ensureStateDir(projectRoot), SESSION_FILE);
   const session: SessionFile = {
     port,
     token,
     protocol: PROTOCOL_VERSION,
     pid: process.pid,
     server: serverVersion,
+    allow_eval: allowEval,
   };
-  writeFileSync(file, `${JSON.stringify(session)}\n`, { mode: PRIVATE_FILE_MODE });
+  writePrivateFile(file, `${JSON.stringify(session)}\n`);
 }
 
 /** Removes the session file if it is still ours (another server may have replaced it). */

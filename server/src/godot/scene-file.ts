@@ -237,8 +237,11 @@ function resourceId(args: readonly GdValue[]): string {
   return typeof id === 'string' ? id : '';
 }
 
+/** Sub-resources are inlined at most this deep (they may reference each other, even cyclically). */
+const MAX_INLINE_DEPTH = 3;
+
 /** Resolves ExtResource/SubResource references so the agent sees what they point to. */
-function describeValue(scene: SceneFile, value: GdValue): string {
+function describeValue(scene: SceneFile, value: GdValue, depth = 0): string {
   if (isCall(value, 'ExtResource')) {
     const ext = scene.extResources.get(resourceId(value.args));
     return ext === undefined ? formatVariant(value) : ext.path;
@@ -246,7 +249,12 @@ function describeValue(scene: SceneFile, value: GdValue): string {
   if (isCall(value, 'SubResource')) {
     const sub = scene.subResources.get(resourceId(value.args));
     if (sub === undefined) return formatVariant(value);
-    const inner = sub.props.map((p) => `${p.key}=${describeValue(scene, p.value)}`).join(', ');
+    if (depth >= MAX_INLINE_DEPTH) return `${sub.type}(…)`;
+    let inner = '';
+    for (const p of sub.props) {
+      inner += `${inner === '' ? '' : ', '}${p.key}=${describeValue(scene, p.value, depth + 1)}`;
+      if (inner.length > MAX_VALUE_CHARS) break; // the caller truncates anyway; stop expanding
+    }
     return `${sub.type}(${inner})`;
   }
   return formatVariant(value);

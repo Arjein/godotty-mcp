@@ -1,9 +1,10 @@
 import type { ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import type { BridgeServer } from '../bridge/bridge-server.js';
 import { ErrorCode, ToolError } from '../util/errors.js';
+import { ensureStateDir } from '../util/state-dir.js';
 import { killGracefully, type GodotExecutable } from './executable.js';
 import {
   errorKey,
@@ -48,6 +49,8 @@ export interface GameManagerOptions {
   injection: RuntimeInjection;
   /** When set, the game's runtime helper connects back to it (screenshots, input, inspection). */
   bridge?: BridgeServer | undefined;
+  /** Lets the runtime helper run eval_gdscript requests. */
+  allowEval?: boolean;
   readyTimeoutMs?: number;
   outputCapacity?: number;
 }
@@ -61,6 +64,7 @@ const RUNS_KEPT = 5;
 const STARTUP_ERRORS_SHOWN = 3;
 export const EVENTS_ARG = '--godotty-events=';
 export const PORT_ARG = '--godotty-port=';
+export const ALLOW_EVAL_ARG = '--godotty-allow-eval';
 /** Passed via the environment, not argv, so other local users can't read it from `ps`. */
 export const TOKEN_ENV = 'GODOTTY_BRIDGE_TOKEN';
 
@@ -173,14 +177,18 @@ export class GameManager {
     // A helper from a previous run must never answer for the new one.
     bridge.peer('runtime')?.close();
     const port = await bridge.listen();
-    return { args: [`${PORT_ARG}${port}`], env: { [TOKEN_ENV]: bridge.token } };
+    const evalArg = this.options.allowEval === true ? [ALLOW_EVAL_ARG] : [];
+    return {
+      args: [`${PORT_ARG}${port}`, ...evalArg],
+      env: { [TOKEN_ENV]: bridge.tokenFor('runtime') },
+    };
   }
 
   private launch(
     options: RunOptions,
     bridge: { args: string[]; env: Record<string, string> },
   ): Run {
-    mkdirSync(this.runsDir, { recursive: true });
+    ensureStateDir(this.options.projectRoot, 'runs');
     pruneRuns(this.runsDir);
     const id = this.nextId++;
     const eventsFile = path.join(this.runsDir, `run-${Date.now()}-${id}.jsonl`);

@@ -19,6 +19,7 @@ const EDITOR_METHODS: Array[String] = [
 	"get_props",
 	"undo",
 	"redo",
+	"eval",
 ]
 
 var _undo_redo: EditorUndoRedoManager
@@ -40,6 +41,10 @@ func run(method: String, params: Dictionary) -> Dictionary:
 
 func _root() -> Node:
 	return EditorInterface.get_edited_scene_root()
+
+
+func _eval_scene() -> Node:
+	return _root()
 
 
 func _tree_start(path: String) -> Node:

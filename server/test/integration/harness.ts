@@ -35,7 +35,10 @@ export function installTestAddon(root: string, framework: 'gut' | 'gdunit4'): vo
   });
 }
 
-export async function startHarness(extraFiles: Record<string, string> = {}): Promise<Harness> {
+export async function startHarness(
+  extraFiles: Record<string, string> = {},
+  options: { allowEval?: boolean } = {},
+): Promise<Harness> {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'godotty-it-')));
   copyDemoProject(root);
   for (const [relative, content] of Object.entries(extraFiles)) {
@@ -45,7 +48,7 @@ export async function startHarness(extraFiles: Record<string, string> = {}): Pro
   const server = createServer({
     projectPath: root,
     godotPath: GODOT,
-    allowEval: false,
+    allowEval: options.allowEval ?? false,
     editorLspPort: 1,
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

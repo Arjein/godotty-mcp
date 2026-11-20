@@ -13,6 +13,8 @@ export interface LspMessage {
 
 const HEADER_END = '\r\n\r\n';
 const CONTENT_LENGTH = /Content-Length: *(\d+)/i;
+/** Refuse absurd frames from whatever listens on the port. */
+const MAX_LSP_MESSAGE_BYTES = 67_108_864; // 64 MiB
 
 /** Encodes one JSON-RPC message with LSP's Content-Length framing. */
 export function encodeLspMessage(message: object): Buffer {
@@ -34,8 +36,10 @@ export class LspDecoder {
       if (match === null) {
         throw new Error('LSP message without Content-Length header');
       }
+      const length = Number(match[1]);
+      if (length > MAX_LSP_MESSAGE_BYTES) throw new Error('LSP message too large');
       const start = headerEnd + HEADER_END.length;
-      const end = start + Number(match[1]);
+      const end = start + length;
       if (this.buffer.length < end) return messages;
       messages.push(JSON.parse(this.buffer.subarray(start, end).toString()) as LspMessage);
       this.buffer = this.buffer.subarray(end);

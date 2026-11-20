@@ -36,7 +36,9 @@ export const checkScripts = defineTool({
       .describe('Include warnings (unused variables, unsafe casts, ...).'),
     limit: z.number().int().min(1).max(MAX_DIAGNOSTICS_LIMIT).default(DEFAULT_DIAGNOSTICS_LIMIT),
   },
-  annotations: { readOnlyHint: true, openWorldHint: false },
+  // Not read-only: it may start a headless editor, which runs the project's @tool scripts and
+  // writes .godot/ caches.
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (args, ctx) => {
     const files = scriptsAt(ctx, args.path);
     if (files.length === 0) return textResult(`No GDScript files found under ${args.path}.`);

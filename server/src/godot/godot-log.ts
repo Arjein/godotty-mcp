@@ -23,8 +23,10 @@ export interface GodotError {
 
 const HEADER =
   /^(USER SCRIPT ERROR|SCRIPT ERROR|USER ERROR|ERROR|SHADER ERROR|USER WARNING|WARNING): ?(.*)$/;
-const AT_LINE = /^\s+at: (?<fn>.*?) \((?<file>.*):(?<line>\d+)\)\s*$/;
-const FRAME_LINE = /^\s+\[\d+\] (?<fn>.*?) \((?<file>.*):(?<line>\d+)\)\s*$/;
+const AT_LINE = /^\s+at: (?<fn>[^(]*) \((?<file>[^()]*):(?<line>\d+)\)\s*$/;
+const FRAME_LINE = /^\s+\[\d+\] (?<fn>[^(]*) \((?<file>[^()]*):(?<line>\d+)\)\s*$/;
+/** Longer lines (from a game's own output) are cut before regex matching. */
+const MAX_MATCHED_LINE = 4_000;
 const CONTINUATION = /^\s/;
 const RES_PREFIX = 'res://';
 
@@ -38,7 +40,8 @@ export function classifyLines(lines: readonly string[]): LogLevel[] {
 }
 
 /** Level of `line` given the level of the line before it on the same stream. */
-export function nextLevel(line: string, previous: LogLevel): LogLevel {
+export function nextLevel(raw: string, previous: LogLevel): LogLevel {
+  const line = raw.length > MAX_MATCHED_LINE ? raw.slice(0, MAX_MATCHED_LINE) : raw;
   const header = HEADER.exec(line);
   if (header !== null) return headerSeverity(header[1] ?? '');
   return CONTINUATION.test(line) && line.trim() !== '' ? previous : 'info';
@@ -55,7 +58,8 @@ export function parseErrorBlocks(lines: readonly string[]): GodotError[] {
       errors.push(blockToError(block.label, block.message, block.at, block.frames));
     block = undefined;
   };
-  for (const line of lines) {
+  for (const raw of lines) {
+    const line = raw.length > MAX_MATCHED_LINE ? raw.slice(0, MAX_MATCHED_LINE) : raw;
     const header = HEADER.exec(line);
     if (header !== null) {
       flush();

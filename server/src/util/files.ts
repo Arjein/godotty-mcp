@@ -1,6 +1,8 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { ErrorCode, ToolError } from './errors.js';
+
 /** File categories agents can filter by, mapped to extensions. */
 export const FILE_TYPES = {
   scene: ['.tscn', '.scn'],
@@ -19,6 +21,8 @@ export type FileType = keyof typeof FILE_TYPES;
 const IGNORED_SUFFIXES = ['.import', '.uid'];
 const GDIGNORE = '.gdignore';
 const ADDONS_DIR = 'addons';
+/** Separate wildcard runs allowed in one glob (backtracking grows with each). */
+const MAX_GLOB_WILDCARDS = 6;
 
 export interface WalkOptions {
   includeAddons: boolean;
@@ -59,7 +63,15 @@ export function matchesType(file: string, type: FileType | 'all'): boolean {
  * A pattern without `/` matches the file name in any folder (like .gitignore).
  */
 export function globToRegExp(glob: string): RegExp {
-  const pattern = glob.replace(/^res:\/\//, '');
+  // Adjacent ** collapse to one; many wildcards make backtracking explode, so they are capped.
+  const pattern = glob.replace(/^res:\/\//, '').replace(/(\*\*\/?){2,}/g, '**/');
+  if ((pattern.match(/\*+/g) ?? []).length > MAX_GLOB_WILDCARDS) {
+    throw new ToolError(
+      ErrorCode.InvalidInput,
+      `The glob has more than ${MAX_GLOB_WILDCARDS} wildcards.`,
+      'Use a simpler pattern, e.g. "scenes/**/*.tscn".',
+    );
+  }
   const anyFolder = !pattern.includes('/');
   let source = '';
   for (let i = 0; i < pattern.length; i++) {

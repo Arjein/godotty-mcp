@@ -84,10 +84,16 @@ describe('run and diagnostics tools', () => {
     expect(all).toMatch(/\d+ {2}\| player spawned/);
     expect(all).toMatch(/\d+ E\| SCRIPT ERROR: boom/);
     expect(all).toMatch(/Next: since=\d+/);
-    const filtered = await tools.call('get_output', { filter: 'warnings', pattern: 'fps' });
+    const filtered = await tools.call('get_output', { filter: 'warnings', contains: 'FPS' });
     expect(filtered.text).toMatch(/1 of 1 matching line\(s\)\n\d+ W\| WARNING: low fps/);
     expect((await tools.call('get_output', { since: 999 })).text).not.toContain('Next:');
-    expect((await tools.call('get_output', { pattern: '(' })).text).toContain('Invalid regex');
+    // A substring filter, never an agent regex: '(' is just text (regression: ReDoS).
+    expect((await tools.call('get_output', { contains: '(a+)+$' })).text).toContain(
+      '0 of 0 matching',
+    );
+    expect((await tools.call('run_game', { args: ['--godotty-allow-eval'] })).text).toContain(
+      'reserved for godotty-mcp',
+    );
 
     expect((await tools.call('project_info')).text).toMatch(
       /Game: running \(run #1, pid \d+, [\d.]+s, helper ready\)/,

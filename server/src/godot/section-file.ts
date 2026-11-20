@@ -62,11 +62,19 @@ class SectionReader {
     return this.sections;
   }
 
+  /** Line counting resumes from the last position asked about (positions only move forward). */
+  private lineCursor = { position: 0, line: 1 };
+
   private lineAt(position: number): number {
-    let line = 1;
-    for (let i = 0; i < position; i++) {
+    let { position: from, line } = this.lineCursor;
+    if (position < from) {
+      from = 0;
+      line = 1;
+    }
+    for (let i = from; i < position; i++) {
       if (this.text[i] === '\n') line++;
     }
+    this.lineCursor = { position, line };
     return line;
   }
 

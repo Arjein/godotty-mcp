@@ -19,7 +19,8 @@ export interface OutputQuery {
   /** Return lines with seq greater than this. When omitted, the newest matching lines are returned. */
   since?: number | undefined;
   filter: LevelFilter;
-  pattern?: RegExp | undefined;
+  /** Case-insensitive substring filter. */
+  contains?: string | undefined;
   limit: number;
 }
 
@@ -65,11 +66,12 @@ export class OutputBuffer {
   }
 
   public query(query: OutputQuery): OutputPage {
+    const needle = query.contains?.toLowerCase();
     const matching = this.lines.filter(
       (line) =>
         (query.since === undefined || line.seq > query.since) &&
         passesFilter(line.level, query.filter) &&
-        (query.pattern === undefined || query.pattern.test(line.text)),
+        (needle === undefined || line.text.toLowerCase().includes(needle)),
     );
     const lines =
       query.since === undefined ? matching.slice(-query.limit) : matching.slice(0, query.limit);

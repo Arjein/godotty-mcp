@@ -4,8 +4,10 @@ import { z } from 'zod';
  * Wire protocol between the MCP server and the Godot side (runtime helper now, editor plugin in
  * M6). Transport: TCP on 127.0.0.1, one JSON object per line (UTF-8, "\n"-terminated).
  *
- * 1. Godot connects and sends `hello` (role, protocol version, session token).
- * 2. The server answers `welcome`, or `rejected` and closes (bad token, unsupported version).
+ * 1. Godot connects and sends `hello` (role, protocol version, the role's token, a random nonce).
+ * 2. The server answers `welcome` with `proof` = HMAC-SHA256(token, nonce), or `rejected` and
+ *    closes (bad token, unsupported version). Godot ignores all requests until the proof checks
+ *    out, so a process squatting on a stale port cannot drive it.
  * 3. The server sends requests `{id, method, params}`; Godot answers `{id, result}` or
  *    `{id, error: {code, message}}`, possibly out of order (commands may await frames).
  *
@@ -17,6 +19,9 @@ export const PROTOCOL_VERSION = 1;
 /** Upper bound for one line; screenshot sequences are the largest messages. */
 export const MAX_MESSAGE_BYTES = 67_108_864; // 64 MiB
 
+const MIN_NONCE_CHARS = 16;
+const MAX_NONCE_CHARS = 128;
+
 export const roleSchema = z.enum(['runtime', 'editor']);
 export type Role = z.infer<typeof roleSchema>;
 
@@ -25,6 +30,8 @@ export const helloSchema = z.object({
   role: roleSchema,
   protocol: z.number().int(),
   token: z.string(),
+  /** Random hex from the peer; the server's welcome carries HMAC-SHA256(token, nonce) as `proof`. */
+  nonce: z.string().min(MIN_NONCE_CHARS).max(MAX_NONCE_CHARS),
   godot: z.string().default(''),
   pid: z.number().int().optional(),
 });
@@ -47,6 +54,8 @@ export const RemoteErrorCode = {
   Headless: 'HEADLESS',
   UnknownMethod: 'UNKNOWN_METHOD',
   BadParams: 'BAD_PARAMS',
+  EvalDisabled: 'EVAL_DISABLED',
+  EvalParse: 'EVAL_PARSE',
 } as const;
 
 // ---------------------------------------------------------------------------------------------
@@ -176,8 +185,19 @@ export interface SetPropsResult {
   props: PropValue[];
 }
 
+export interface EvalParams {
+  code: string;
+}
+export interface EvalResult {
+  /** var_to_str of the returned value. */
+  value: string;
+  /** Errors raised while the code ran (line numbers relative to the code). */
+  errors: string[];
+}
+
 /** Every runtime method with its params and result types. */
 export interface RuntimeMethods {
+  eval: { params: EvalParams; result: EvalResult };
   screenshot: { params: ScreenshotParams; result: ScreenshotResult };
   input: { params: InputParams; result: InputResult };
   wait: { params: WaitParams; result: WaitResult };
@@ -244,6 +264,7 @@ export interface EditorMethods {
   /** Test/maintenance hooks: step the edited scene's undo history. */
   undo: { params: Record<string, never>; result: SceneInfo & { action: string } };
   redo: { params: Record<string, never>; result: SceneInfo & { action: string } };
+  eval: { params: EvalParams; result: EvalResult };
 }
 export type EditorMethod = keyof EditorMethods;
 
@@ -265,4 +286,6 @@ export interface SessionFile {
   protocol: number;
   pid: number;
   server: string;
+  /** The editor plugin only runs eval requests when this is true. */
+  allow_eval: boolean;
 }

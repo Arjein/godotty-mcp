@@ -10,6 +10,7 @@ const EVENTS_ARG: String = "--godotty-events="
 const PORT_ARG: String = "--godotty-port="
 ## The session token comes from the environment (not argv, which other local users can read).
 const TOKEN_ENV: String = "GODOTTY_BRIDGE_TOKEN"
+const ALLOW_EVAL_ARG: String = "--godotty-allow-eval"
 const READY_EVENT: String = "ready"
 const ErrorLogger = preload("godotty_error_logger.gd")
 const BridgeClient = preload("godotty_bridge_client.gd")
@@ -62,7 +63,9 @@ func _start_bridge() -> void:
 		return
 	var client: BridgeClient = BridgeClient.new()
 	client.name = "Bridge"
-	client.setup(port.to_int(), token, Commands.new(self))
+	var commands: Commands = Commands.new(self)
+	commands.eval_allowed = ALLOW_EVAL_ARG in OS.get_cmdline_user_args()
+	client.setup(port.to_int(), token, commands)
 	add_child(client)
 
 

@@ -10,6 +10,7 @@ import type {
   TreeResult,
 } from '../bridge/protocol.js';
 import { ErrorCode, ToolError } from '../util/errors.js';
+import { assertSafeLiterals } from '../util/literals.js';
 import { defineTool, textResult, type ToolContext } from './registry.js';
 
 const DEFAULT_MAX_SIZE = 960;
@@ -124,20 +125,11 @@ export const screenshot = defineTool({
   },
 });
 
-const holdMode = z
-  .enum(['tap', 'press', 'release', 'hold'])
-  .default('tap')
-  .describe(
-    'tap = press then release 2 physics frames later; hold = press, wait duration_ms, release.',
-  );
-const duration = z
-  .number()
-  .int()
-  .min(0)
-  .max(MAX_DURATION_MS)
-  .optional()
-  .describe('For hold: how long to hold, ms (default 500).');
-const position = z.tuple([z.number(), z.number()]).describe('Viewport coordinates [x, y].');
+// Semantics of mode/duration_ms/position are explained once in the tool description; describing
+// them on these shared schemas would repeat the text in every step variant of the JSON schema.
+const holdMode = z.enum(['tap', 'press', 'release', 'hold']).default('tap');
+const duration = z.number().int().min(0).max(MAX_DURATION_MS).optional();
+const position = z.tuple([z.number(), z.number()]);
 
 const stepSchema = z.discriminatedUnion('type', [
   z.object({
@@ -177,10 +169,13 @@ export const sendInput = defineTool({
   name: 'send_input',
   title: 'Send input',
   description:
-    'Plays a sequence of input steps in the running game, in order, with real timing: InputMap actions ' +
-    '(best: "jump", "move_right"), keys, mouse clicks and moves, and waits. Events go through Godot\'s ' +
-    'input pipeline like real devices. Example: [{"type":"action","action":"move_right","mode":"hold",' +
-    '"duration_ms":800},{"type":"action","action":"jump"}]. Set screenshot_after to see the result.',
+    "Plays input steps in the running game, in order, with real timing; events go through Godot's input " +
+    'pipeline like real devices. Step types: action (InputMap name; best choice, e.g. "jump"), key (Godot ' +
+    'key name: "A", "Space", "Escape", "Left"), mouse_button (position = viewport pixels [x, y]), ' +
+    'mouse_motion, wait (ms or frames). mode: tap (default: press, release 2 physics frames later), press, ' +
+    'release, or hold (press, wait duration_ms, default 500, release). Example: [{"type":"action",' +
+    '"action":"move_right","mode":"hold","duration_ms":800},{"type":"action","action":"jump"}]. ' +
+    'screenshot_after returns an image of the result.',
   inputSchema: {
     steps: z.array(stepSchema).min(1).max(MAX_STEPS),
     screenshot_after: z
@@ -251,6 +246,7 @@ export const wait = defineTool({
         'For a property condition pass node + property (+ op/value).',
       );
     }
+    assertSafeLiterals([args.value], ctx.config.allowEval);
     const until =
       args.node === undefined
         ? undefined
@@ -390,6 +386,7 @@ export const setNodeProperty = defineTool({
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (args, ctx) => {
+    assertSafeLiterals(Object.values(args.properties), ctx.config.allowEval);
     const result = await ctx.runtime.call(
       'set_props',
       { path: args.node, values: args.properties },

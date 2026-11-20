@@ -94,8 +94,13 @@ export class GodotExecutable {
       let stdout = '';
       let stderr = '';
       let timedOut = false;
-      child.stdout?.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
-      child.stderr?.on('data', (chunk: Buffer) => (stderr += chunk.toString()));
+      // Keep only the tail: a chatty process (e.g. a long test run) must not exhaust memory.
+      child.stdout?.on('data', (chunk: Buffer) => {
+        stdout = keepTail(stdout + chunk.toString());
+      });
+      child.stderr?.on('data', (chunk: Buffer) => {
+        stderr = keepTail(stderr + chunk.toString());
+      });
       const timer = setTimeout(() => {
         timedOut = true;
         killGracefully(child);
@@ -130,6 +135,15 @@ export class GodotExecutable {
     }
     return version;
   }
+}
+
+/** Most output kept per stream of a one-shot command. */
+export const MAX_EXEC_OUTPUT_CHARS = 8_000_000;
+
+function keepTail(text: string): string {
+  return text.length > MAX_EXEC_OUTPUT_CHARS
+    ? text.slice(text.length - MAX_EXEC_OUTPUT_CHARS)
+    : text;
 }
 
 /** SIGTERM, then SIGKILL if the process hasn't exited after a grace period. */

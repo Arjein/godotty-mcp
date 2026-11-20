@@ -12,6 +12,10 @@ const DEFAULT_OUTPUT_LIMIT = 100;
 const MAX_OUTPUT_LIMIT = 500;
 const MAX_LINE_CHARS = 500;
 const MAX_PATTERN_CHARS = 200;
+const MAX_ARGS = 50;
+const MAX_ARG_CHARS = 1000;
+/** Arguments the server passes to the runtime helper; agents may not forge them. */
+const RESERVED_ARG_PREFIX = '--godotty-';
 const LEVEL_MARK = { info: ' ', warning: 'W', error: 'E' } as const;
 
 /** One-line run summary shared by run/diagnostic tools. */
@@ -37,13 +41,22 @@ export const runGame = defineTool({
   inputSchema: {
     scene: z.string().optional().describe('res:// scene to run instead of the main scene.'),
     args: z
-      .array(z.string())
+      .array(z.string().max(MAX_ARG_CHARS))
+      .max(MAX_ARGS)
       .default([])
       .describe('Extra user arguments for the game (OS.get_cmdline_user_args()).'),
     headless: z.boolean().default(false).describe('Run without a window or rendering.'),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (args, ctx) => {
+    const forged = args.args.find((a) => a.startsWith(RESERVED_ARG_PREFIX));
+    if (forged !== undefined) {
+      throw new ToolError(
+        ErrorCode.InvalidInput,
+        `"${forged}" is reserved for godotty-mcp.`,
+        'Remove arguments starting with --godotty-.',
+      );
+    }
     let scene: string | undefined;
     if (args.scene !== undefined) {
       const file = ctx.sandbox.resolve(args.scene);
@@ -112,18 +125,18 @@ export const getOutput = defineTool({
   description:
     'Returns console output (stdout+stderr) of the current or last run, each line prefixed with its ' +
     'sequence number and level (E=error, W=warning). Without "since" returns the newest lines; pass ' +
-    '"since" = the last sequence number you saw to get only new lines. Filter by level or a regex pattern.',
+    '"since" = the last sequence number you saw to get only new lines. Filter by level or by text.',
   inputSchema: {
     since: z.number().int().min(0).optional().describe('Only lines after this sequence number.'),
     filter: z
       .enum(['all', 'warnings', 'errors'])
       .default('all')
       .describe('"warnings" includes errors.'),
-    pattern: z
+    contains: z
       .string()
       .max(MAX_PATTERN_CHARS)
       .optional()
-      .describe('JavaScript regex; only matching lines are returned.'),
+      .describe('Only lines containing this text (case-insensitive).'),
     limit: z.number().int().min(1).max(MAX_OUTPUT_LIMIT).default(DEFAULT_OUTPUT_LIMIT),
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
@@ -131,7 +144,7 @@ export const getOutput = defineTool({
     const page = ctx.game.output({
       since: args.since,
       filter: args.filter,
-      pattern: compilePattern(args.pattern),
+      contains: args.contains,
       limit: args.limit,
     });
     const header = `${describeRun(page.run)} — ${page.lines.length} of ${page.matched} matching line(s)`;
@@ -143,18 +156,6 @@ export const getOutput = defineTool({
     );
   },
 });
-
-function compilePattern(pattern: string | undefined): RegExp | undefined {
-  if (pattern === undefined) return undefined;
-  try {
-    return new RegExp(pattern);
-  } catch (error) {
-    throw new ToolError(
-      ErrorCode.InvalidInput,
-      `Invalid regex: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
 
 function formatLine(line: OutputLine): string {
   const text =

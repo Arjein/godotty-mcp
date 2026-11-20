@@ -10,6 +10,8 @@ export type Handler = (
 export class FakeRuntime {
   public readonly requests: { method: string; params: Record<string, unknown> }[] = [];
   public readonly received: unknown[] = [];
+  /** Sent in the hello; the welcome's proof must be HMAC(token, nonce). */
+  public readonly nonce = 'abcdef0123456789abcdef0123456789';
   private socket: Socket | undefined;
 
   public constructor(private readonly handlers: Record<string, Handler> = {}) {}
@@ -38,7 +40,7 @@ export class FakeRuntime {
       });
       socket.on('connect', () => {
         socket.write(
-          `${JSON.stringify({ type: 'hello', role: 'runtime', protocol: PROTOCOL_VERSION, godot: '4.7.2', ...hello })}\n`,
+          `${JSON.stringify({ type: 'hello', role: 'runtime', protocol: PROTOCOL_VERSION, godot: '4.7.2', nonce: this.nonce, ...hello })}\n`,
         );
       });
     });

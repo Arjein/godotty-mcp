@@ -39,7 +39,7 @@ describe('OutputBuffer', () => {
     expect(buffer.query({ ...ALL, since: 4 }).lines).toEqual([]);
   });
 
-  it('filters by level and pattern and reports matches', () => {
+  it('filters by level and text and reports matches', () => {
     const buffer = new OutputBuffer(100);
     buffer.push('stderr', 'WARNING: w\nERROR: e\n');
     buffer.push('stdout', 'info line\n');
@@ -47,7 +47,7 @@ describe('OutputBuffer', () => {
       'ERROR: e',
     ]);
     expect(buffer.query({ ...ALL, filter: 'warnings' }).matched).toBe(2);
-    expect(buffer.query({ ...ALL, pattern: /info/ }).lines.map((l) => l.text)).toEqual([
+    expect(buffer.query({ ...ALL, contains: 'INFO' }).lines.map((l) => l.text)).toEqual([
       'info line',
     ]);
   });

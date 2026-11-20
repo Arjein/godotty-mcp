@@ -1,7 +1,6 @@
 import {
   copyFileSync,
   existsSync,
-  mkdirSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -21,8 +20,9 @@ import { fileURLToPath } from 'node:url';
  * server start clean up after a crash.
  */
 
-/** Folder (inside the project's .godot) owned by godotty-mcp. */
-export const STATE_DIR = path.join('.godot', 'godotty_mcp');
+import { ensureStateDir, STATE_DIR } from '../util/state-dir.js';
+
+export { STATE_DIR };
 export const AUTOLOAD_NAME = 'GodottyRuntime';
 export const RUNTIME_ENTRY = 'godotty_runtime.gd';
 export const OVERRIDE_MARKER = '; godotty-mcp: temporary override, restored automatically';
@@ -36,7 +36,7 @@ export class RuntimeInjection {
   private readonly backupPath: string;
 
   public constructor(
-    projectRoot: string,
+    private readonly projectRoot: string,
     private readonly runtimeSourceDir: string,
   ) {
     this.stateDir = path.join(projectRoot, STATE_DIR);
@@ -47,11 +47,12 @@ export class RuntimeInjection {
   /** Copies the helper and writes the temporary override. Call `restore()` afterwards. */
   public inject(): void {
     this.recover();
-    const runtimeDir = path.join(this.stateDir, 'runtime');
-    mkdirSync(runtimeDir, { recursive: true });
+    const runtimeDir = ensureStateDir(this.projectRoot, 'runtime');
     for (const file of readdirSync(this.runtimeSourceDir)) {
-      if (file.endsWith('.gd'))
-        copyFileSync(path.join(this.runtimeSourceDir, file), path.join(runtimeDir, file));
+      if (!file.endsWith('.gd')) continue;
+      const target = path.join(runtimeDir, file);
+      rmSync(target, { force: true });
+      copyFileSync(path.join(this.runtimeSourceDir, file), target);
     }
     const original = existsSync(this.overridePath)
       ? readFileSync(this.overridePath, 'utf8')

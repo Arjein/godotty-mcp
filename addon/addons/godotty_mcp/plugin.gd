@@ -51,9 +51,12 @@ func _poll() -> void:
 	_session_key = key
 	if session.is_empty() or not _protocol_matches(int(session.get("protocol", 0))):
 		return
+	# A stale session file (crashed server) may point at a port someone else now owns; that is
+	# safe because the bridge client ignores everything until the server proves the token.
 	_client = BridgeClient.new()
 	_client.name = "GodottyBridge"
 	var commands: EditorCommands = EditorCommands.new(self, get_undo_redo())
+	commands.eval_allowed = session.get("allow_eval", false) == true
 	_client.setup(int(session.get("port", 0)), str(session.get("token", "")), commands, ROLE)
 	add_child(_client)
 

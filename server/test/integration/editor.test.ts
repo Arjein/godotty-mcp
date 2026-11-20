@@ -150,6 +150,12 @@ describe('editor plugin: undoable scene edits in a real (headless) Godot editor'
     expect(h.server.services.bridge.peer('editor')).toBe(connected);
   });
 
+  it('refuses eval in the editor when the server did not enable it (plugin-side lock)', async () => {
+    await expect(
+      h.server.services.editor.call('eval', { code: 'return 1' }, 5000),
+    ).rejects.toMatchObject({ code: 'DISABLED' });
+  });
+
   it('creates new scenes and refuses to overwrite', async () => {
     const created = await h.call('open_scene', {
       path: 'res://scenes/levels/level_one.tscn',

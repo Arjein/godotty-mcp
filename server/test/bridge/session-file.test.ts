@@ -30,8 +30,11 @@ describe('session file', () => {
       protocol: 1,
       pid: process.pid,
       server: '1.2.3',
+      allow_eval: false,
     });
     expect(statSync(file).mode & 0o777).toBe(0o600);
+    writeSessionFile(project.root, 4321, 'secret', '1.2.3', true);
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({ allow_eval: true });
   });
 
   it('is removed only while it still belongs to this process', () => {

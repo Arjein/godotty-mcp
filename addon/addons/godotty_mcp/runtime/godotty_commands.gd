@@ -6,6 +6,7 @@ extends RefCounted
 ## server/src/bridge/protocol.ts for parameter and result shapes.
 
 const GodottyInput = preload("godotty_input.gd")
+const GodottyEval = preload("godotty_eval.gd")
 
 const MAX_VALUE_CHARS: int = 200
 const MAX_TEXT_CHARS: int = 40
@@ -15,8 +16,15 @@ const AUTOLOAD_NAME: String = "GodottyRuntime"
 const SKIPPED_USAGE: int = PROPERTY_USAGE_CATEGORY | PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP
 const LISTED_USAGE: int = PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_SCRIPT_VARIABLE
 
+## Literals that make str_to_var load resources or build objects — loading a script can run its
+## code, so these are refused unless eval is enabled.
+const UNSAFE_LITERAL: String = "\\b(Object|Resource|ExtResource|SubResource)\\s*\\("
+
+## Set by the owner when the server enabled eval_gdscript (--allow-eval).
+var eval_allowed: bool = false
 var _host: Node
 var _input: GodottyInput
+var _unsafe_literal: RegEx = RegEx.create_from_string(UNSAFE_LITERAL)
 
 
 func _init(host: Node) -> void:
@@ -70,6 +78,11 @@ func _cmd_input(params: Dictionary) -> Dictionary:
 
 
 func _cmd_wait(params: Dictionary) -> Dictionary:
+	var until: Variant = params.get("until", {})
+	if until is Dictionary and (until as Dictionary).has("value"):
+		var problem: String = _literal_problem(str(until["value"]))
+		if problem != "":
+			return _error("INVALID_VALUE", problem)
 	var start_ms: int = Time.get_ticks_msec()
 	var start_frame: int = Engine.get_process_frames()
 	var outcome: Dictionary = {"met": true}
@@ -256,7 +269,13 @@ func _cmd_set_props(params: Dictionary) -> Dictionary:
 func _parse_assignment(node: Node, name: String, literal: String, parsed: Dictionary) -> String:
 	if not _has_property(node, name):
 		return "%s has no property '%s'." % [node.get_class(), name]
+	var unsafe: String = _literal_problem(literal)
+	if unsafe != "":
+		return unsafe
 	var value: Variant = str_to_var(literal)
+	# Second layer behind the literal check: nothing that parsed into an object gets through.
+	if typeof(value) == TYPE_OBJECT and not eval_allowed:
+		return "Object values are not allowed; attach scripts with update_node script=..."
 	if value == null and literal.strip_edges() != "null":
 		return 'Cannot parse \'%s\' as a Godot value (strings need quotes: "\\"text\\"").' % literal
 	var current: Variant = node.get_indexed(NodePath(name))
@@ -267,6 +286,35 @@ func _parse_assignment(node: Node, name: String, literal: String, parsed: Dictio
 		)
 	parsed[name] = value
 	return ""
+
+
+## "" if `literal` is safe to give to str_to_var, else why not.
+func _literal_problem(literal: String) -> String:
+	if eval_allowed or _unsafe_literal.search(literal) == null:
+		return ""
+	return (
+		"Object/Resource literals are not allowed (loading a resource can run script code). "
+		+ "Attach scripts with update_node script=..., or enable eval_gdscript."
+	)
+
+
+func _cmd_eval(params: Dictionary) -> Dictionary:
+	if not eval_allowed:
+		return _error(
+			"EVAL_DISABLED", "eval is disabled (the server was not started with --allow-eval)."
+		)
+	var outcome: Dictionary = await GodottyEval.new().evaluate(
+		str(params.get("code", "")), _host.get_tree(), _eval_scene()
+	)
+	if outcome.has("parse_errors"):
+		var errors: Array = outcome["parse_errors"]
+		return _error("EVAL_PARSE", "\n".join(errors) if not errors.is_empty() else "Parse error.")
+	return _ok(outcome)
+
+
+## What `scene` refers to inside eval code: the current scene of the game.
+func _eval_scene() -> Node:
+	return _host.get_tree().current_scene
 
 
 func _assignable(current: Variant, value: Variant) -> bool:

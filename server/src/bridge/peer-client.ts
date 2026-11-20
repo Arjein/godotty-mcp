@@ -27,6 +27,14 @@ const REMOTE_HINTS: Readonly<Record<string, { code: ErrorCode; hint: string }>> 
     code: ErrorCode.InvalidInput,
     hint: 'Use Godot key names: A, Space, Enter, Escape, Left, Shift, F1, …',
   },
+  [RemoteErrorCode.EvalDisabled]: {
+    code: ErrorCode.Disabled,
+    hint: 'Start the server with --allow-eval (or GODOTTY_ALLOW_EVAL=1) and relaunch the game / reopen the editor.',
+  },
+  [RemoteErrorCode.EvalParse]: {
+    code: ErrorCode.InvalidInput,
+    hint: 'Fix the GDScript; the code is the body of a function, so use return to send back a value.',
+  },
   [EditorErrorCode.NoScene]: { code: ErrorCode.InvalidInput, hint: 'Open one with open_scene.' },
   [EditorErrorCode.InvalidType]: {
     code: ErrorCode.InvalidInput,

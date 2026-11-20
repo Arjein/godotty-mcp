@@ -23,10 +23,32 @@ class FakeCommands:
 		return {"result": {}}
 
 
+func _proof(client: BridgeClient, token: String) -> String:
+	var key: PackedByteArray = token.to_utf8_buffer()
+	var nonce: PackedByteArray = client._nonce.to_utf8_buffer()
+	return Crypto.new().hmac_digest(HashingContext.HASH_SHA256, key, nonce).hex_encode()
+
+
+func test_requests_are_ignored_until_the_server_proves_the_token() -> void:
+	var commands: FakeCommands = FakeCommands.new()
+	var client: QuietClient = QuietClient.new()
+	client.setup(1, "token", commands)
+	client._dispatch(JSON.stringify({"id": 1, "method": "tree", "params": {}}))
+	await wait_physics_frames(1)
+	assert_eq(commands.calls.size(), 0, "no requests before the welcome proof")
+	client._dispatch(JSON.stringify({"type": "welcome", "proof": "forged"}))
+	assert_true(client._finished)
+	assert_false(client.is_authenticated())
+	assert_string_contains(client.warnings[0], "failed to prove")
+	client.free()
+
+
 func test_dispatch_runs_requests_with_their_params() -> void:
 	var commands: FakeCommands = FakeCommands.new()
 	var client: BridgeClient = BridgeClient.new()
 	client.setup(1, "token", commands)
+	client._dispatch(JSON.stringify({"type": "welcome", "proof": _proof(client, "token")}))
+	assert_true(client.is_authenticated())
 	client._dispatch(JSON.stringify({"id": 3, "method": "tree", "params": {"depth": 2}}))
 	await wait_physics_frames(1)
 	assert_eq(commands.calls.size(), 1)
@@ -41,11 +63,11 @@ func test_dispatch_ignores_garbage_and_stops_when_rejected() -> void:
 	client.setup(1, "token", commands)
 	client._dispatch("not json")
 	client._dispatch(JSON.stringify([1, 2]))
-	client._dispatch(JSON.stringify({"type": "welcome", "protocol": 1}))
+	client._dispatch(JSON.stringify({"type": "news"}))
 	assert_eq(commands.calls.size(), 0)
 	client._dispatch(JSON.stringify({"type": "rejected", "reason": "invalid token"}))
 	assert_true(client._finished)
-	assert_eq(client.warnings, ["godotty-mcp: bridge rejected this game: invalid token"])
+	assert_eq(client.warnings, ["godotty-mcp: bridge rejected this runtime: invalid token"])
 	client.free()
 
 
