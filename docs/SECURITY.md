@@ -26,6 +26,9 @@ resource or build an object (`Resource("…")`, `Object(…)`) are rejected on b
 Godot side, because loading a script resource can run its code. `eval_gdscript` exists only when
 the server runs with `--allow-eval`, and Godot independently refuses eval unless the server
 launched the game (or published the editor session) with eval allowed.
+Property reads may call zero-argument methods named `is_*`, `has_*`, `can_*` or `get_*`
+(`is_open()`); that runs the project's own methods, nothing the agent wrote, and any other name
+(`queue_free()`, `set_*`) or a method that needs arguments is refused.
 
 **The bridge is loopback-only and mutually authenticated.** The server listens on `127.0.0.1` on a
 random port. The game and the editor each get their own random 256-bit token: the game through an

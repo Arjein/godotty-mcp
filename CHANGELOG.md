@@ -6,6 +6,35 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `pause_game` and `step_game`: freeze the running game between agent calls and advance exact
+  physics frames. While paused, `send_input`, `wait` and `press_control` run the game for their
+  own duration and pause it again. `run_game paused=true` starts frozen.
+- `list_controls` and `press_control`: find visible UI controls and click, focus or accept one by
+  its text or node path, with a warning when a button did not emit `pressed`.
+- `send_input observe`: watch node properties during a batch and get every change with its time
+  and step.
+- Zero-argument getters (`is_open()`, `state_machine:current_name()`; `is_`/`has_`/`can_`/`get_`
+  only) in `get_node_properties`, `wait` and `observe`.
+- `install_addon` tool; `run_tests fixed_fps`; `check_scripts exclude_codes`, with repeated warning
+  codes grouped per file.
+
+### Changed
+
+- Object values show what they are: nodes as `<Class /path script.gd>`, other objects as
+  `<Class script.gd>`, instead of `<Node>` / `<RefCounted>`.
+- `inspect_scene_tree` rounds positions to 3 decimals (`pos=(0, 0.001, 6.899)`).
+- Screenshots default to `max_size` 640 (was 960).
+
+### Fixed
+
+- The server no longer exits when the project folder has no `project.godot` yet (clients only saw
+  "Connection closed"). Project tools return `NOT_FOUND` until it exists and then work without a
+  restart; `godot_docs` works throughout.
+- `project_info` no longer claims the editor addon "arrives in a later version"; it says whether
+  the plugin is connected, enabled, installed, or how to install it.
+
 ## [0.1.1] - 2026-11-20
 
 ### Added

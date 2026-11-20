@@ -26,8 +26,10 @@ reference _of your installed Godot version_, and run your GUT or gdUnit4 tests.
 ## What makes it different
 
 - **It sees and plays the game.** `screenshot` returns real frames (sequences too), `send_input`
-  drives actions, keys and the mouse through Godot's input pipeline, `wait` blocks until
-  `Player.position:y < 1`, and `get_node_properties` confirms what happened.
+  drives actions, keys and the mouse through Godot's input pipeline, `press_control` clicks a button
+  by its label, `wait` blocks until `Player.position:y < 1`, and `get_node_properties` confirms
+  what happened. `pause_game` and `step_game` freeze the game between calls, so an action game
+  doesn't play itself while the agent thinks.
 - **Diagnostics from Godot itself.** `check_scripts` uses Godot's own GDScript language server
   (errors _and_ warnings with line and column); `get_errors` captures runtime errors with full
   GDScript backtraces through Godot's Logger API, not by scraping logs.
@@ -51,7 +53,9 @@ reference _of your installed Godot version_, and run your GUT or gdUnit4 tests.
 ## Quick start
 
 Point Godotty at your project folder (the one containing `project.godot`) and your Godot
-executable. If `godot` is on your `PATH` you can leave out `--godot`.
+executable. If `godot` is on your `PATH` you can leave out `--godot`. The server also starts in a
+folder without `project.godot` yet: project tools answer `NOT_FOUND` until it exists, then work
+without a restart.
 
 ### Claude Code
 
@@ -133,6 +137,7 @@ The repository's [demo project](examples/demo-project) is a ready-made playgroun
 | `project_info`                | Godot version, main scene, autoloads, input map with bindings, plugins, game/editor status                       |
 | `list_files`                  | Project files as `res://` paths, filtered by type and glob, paginated                                            |
 | `read_scene`                  | Compact node tree of a `.tscn` with saved properties and signal connections                                      |
+| `install_addon`               | Copy the editor plugin into `addons/godotty_mcp` (then enable it in Project Settings → Plugins)                  |
 | **Docs & diagnostics**        |                                                                                                                  |
 | `godot_docs`                  | Class reference of your installed Godot: class overviews, members (through inheritance), enums, search           |
 | `check_scripts`               | GDScript errors and warnings with line:column from Godot's language server                                       |
@@ -143,10 +148,14 @@ The repository's [demo project](examples/demo-project) is a ready-made playgroun
 | `get_output`                  | Console output with levels, a cursor for new lines, and level/text filters                                       |
 | **See & play** (running game) |                                                                                                                  |
 | `screenshot`                  | Rendered frame(s) as images, scaled to a maximum size                                                            |
-| `send_input`                  | Actions, keys, mouse buttons/motion, holds and waits, in order with real timing                                  |
-| `wait`                        | Frames, seconds, or until a node exists / a property meets a condition                                           |
+| `send_input`                  | Actions, keys, mouse buttons/motion, holds and waits, in order with real timing; `observe` reports value changes |
+| `list_controls`               | Visible buttons and focusable controls with text, path, rect and focus/disabled state                            |
+| `press_control`               | Click, focus or accept a control found by its text or path                                                       |
+| `wait`                        | Frames, seconds, or until a node exists / a property or getter meets a condition                                 |
+| `pause_game`                  | Freeze the game between calls (or resume it); optional `time_scale`                                              |
+| `step_game`                   | Run exactly N physics frames, then stay paused                                                                   |
 | `inspect_scene_tree`          | Live node tree of the game — or of the scene open in the editor (`target: editor`)                               |
-| `get_node_properties`         | Property values of a live node (game or editor)                                                                  |
+| `get_node_properties`         | Property values (and zero-argument getters like `is_open()`) of a live node, game or editor                      |
 | `set_node_property`           | Change live properties in the running game (not saved)                                                           |
 | **Editor** (needs the plugin) |                                                                                                                  |
 | `open_scene`                  | Open a scene in the editor, or create a new one                                                                  |
@@ -155,7 +164,7 @@ The repository's [demo project](examples/demo-project) is a ready-made playgroun
 | `update_node`                 | Properties, rename, reparent, attach/detach script in one undoable step                                          |
 | `save_scene`                  | Save the edited scene (or save as)                                                                               |
 | **Tests**                     |                                                                                                                  |
-| `run_tests`                   | Run GUT or gdUnit4 headless; totals, failures with file:line, skipped and missing tests                          |
+| `run_tests`                   | Run GUT or gdUnit4 headless (optionally `fixed_fps`); totals, failures with file:line, skipped and missing tests |
 | **Opt-in**                    |                                                                                                                  |
 | `eval_gdscript`               | Run GDScript in the game or editor (only with `--allow-eval`)                                                    |
 
