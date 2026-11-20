@@ -32,6 +32,11 @@ export default tseslint.config(
     files: ['**/*.test.ts', '**/test/**/*.ts'],
     rules: { '@typescript-eslint/no-magic-numbers': 'off' },
   },
+  {
+    // Generated from Godot's class reference: a table of enum values by design.
+    files: ['server/src/godot/input-names.ts'],
+    rules: { '@typescript-eslint/no-magic-numbers': 'off' },
+  },
   { files: ['**/*.js'], ...tseslint.configs.disableTypeChecked },
   prettier,
 );

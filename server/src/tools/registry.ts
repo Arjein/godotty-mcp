@@ -3,13 +3,19 @@ import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/
 import { z } from 'zod';
 
 import type { ServerConfig } from '../config.js';
+import type { GodotExecutable } from '../godot/executable.js';
+import type { GameManager } from '../godot/game.js';
+import type { ScriptChecker } from '../godot/script-checker.js';
 import { formatError } from '../util/errors.js';
 import type { ProjectSandbox } from '../util/sandbox.js';
 
-/** Everything a tool handler may depend on. Extended as milestones add Godot/bridge services. */
+/** Everything a tool handler may depend on. Extended as milestones add bridge services. */
 export interface ToolContext {
   config: ServerConfig;
   sandbox: ProjectSandbox;
+  godot: GodotExecutable;
+  game: GameManager;
+  checker: ScriptChecker;
 }
 
 /**

@@ -8,7 +8,15 @@ import { formatError } from './util/errors.js';
 /** stdio entry point. stdout belongs to the MCP protocol, so all diagnostics go to stderr. */
 async function main(): Promise<void> {
   const config = loadConfig(process.argv.slice(2), process.env, process.cwd());
-  const { server, registeredTools } = createServer(config);
+  const { server, registeredTools, services } = createServer(config);
+  const shutdown = (): void => {
+    services.dispose();
+    process.exit(0);
+  };
+  // The client closing stdin (or signalling us) ends the session: stop Godot processes first.
+  process.stdin.on('close', shutdown);
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
   await server.connect(new StdioServerTransport());
   console.error(
     `godotty-mcp: serving ${config.projectPath} (${registeredTools.length} tools, godot: ${config.godotPath})`,

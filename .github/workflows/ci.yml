@@ -14,14 +14,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [20, 22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install gdtoolkit
@@ -31,3 +31,45 @@ jobs:
       - run: npm run typecheck
       - run: npm run coverage
       - run: npm run build
+
+  integration:
+    name: Integration (Godot ${{ matrix.godot }})
+    runs-on: ubuntu-latest
+    needs: lint-and-unit
+    strategy:
+      fail-fast: false
+      matrix:
+        # Minimum supported version and the latest pinned release.
+        godot: ['4.5.2', '4.7.2']
+    env:
+      GODOT_PATH: ${{ github.workspace }}/.godot-bin/godot
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v6
+        with:
+          path: .godot-bin
+          key: godot-${{ matrix.godot }}-linux-x86_64
+      - name: Download and verify Godot ${{ matrix.godot }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          tag="${{ matrix.godot }}-stable"
+          zip="Godot_v${tag}_linux.x86_64.zip"
+          base="https://github.com/godotengine/godot/releases/download/${tag}"
+          mkdir -p .godot-bin && cd .godot-bin
+          curl -fsSLO "${base}/${zip}"
+          curl -fsSLO "${base}/SHA512-SUMS.txt"
+          grep " ${zip}\$" SHA512-SUMS.txt | sha512sum -c -
+          unzip -q "${zip}"
+          mv "Godot_v${tag}_linux.x86_64" godot
+          chmod +x godot
+          rm "${zip}" SHA512-SUMS.txt
+      - run: ${{ env.GODOT_PATH }} --version
+      - run: npm ci
+      - run: npm run test:integration

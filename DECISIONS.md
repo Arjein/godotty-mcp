@@ -16,4 +16,13 @@
   take `target: game|editor`.
 - [2026-11-20] Screenshots need a real renderer (`--headless` uses a dummy one): `run_game` is
   windowed by default; CI renders under xvfb with `opengl3`/llvmpipe.
+- [2026-11-20] Docs (M3): `--doctool` gives version-exact signatures but no description text, so
+  `godot_docs` takes signatures from the local binary and descriptions from the engine's
+  `doc/classes` XML at the matching `X.Y.Z-stable` tag, fetched per class and cached; works
+  offline with signatures only.
+- [2026-11-20] Runtime errors: counts come from the runtime helper's Logger records; stderr adds
+  only errors the helper never saw (before it loaded). Matching uses message + script location.
+- [2026-11-20] `override.cfg` lives only from launch until the helper reports ready (or the launch
+  fails), then the user's file is restored; a marker line lets the next server start recover
+  after a crash.
 - [2026-11-20] TypeScript pinned to 6.0.x (typescript-eslint 8.x supports `<6.1`).

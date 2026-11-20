@@ -12,12 +12,15 @@ export interface ServerConfig {
   godotPath: string;
   /** Registers `eval_gdscript`. Off unless explicitly enabled. */
   allowEval: boolean;
+  /** Port of the Godot editor's GDScript language server (editor setting; default 6005). */
+  editorLspPort?: number | undefined;
 }
 
 export const ENV = {
   project: 'GODOT_PROJECT_PATH',
   godot: 'GODOT_PATH',
   allowEval: 'GODOTTY_ALLOW_EVAL',
+  lspPort: 'GODOT_LSP_PORT',
 } as const;
 
 const DEFAULT_GODOT = 'godot';
@@ -27,6 +30,7 @@ export const USAGE = `Usage: godotty-mcp [--project <dir>] [--godot <executable>
 
   --project <dir>    Godot project root (env ${ENV.project}; default: current directory)
   --godot <path>     Godot 4 executable (env ${ENV.godot}; default: "godot" on PATH)
+  --lsp-port <port>  Editor GDScript language server port (env ${ENV.lspPort}; default 6005)
   --allow-eval       Enable eval_gdscript, which runs arbitrary GDScript (env ${ENV.allowEval}=1)
   --help             Show this help`;
 
@@ -47,6 +51,7 @@ export function loadConfig(
     options: {
       project: { type: 'string' },
       godot: { type: 'string' },
+      'lsp-port': { type: 'string' },
       'allow-eval': { type: 'boolean' },
       help: { type: 'boolean' },
     },
@@ -57,11 +62,27 @@ export function loadConfig(
   }
   const projectPath = path.resolve(cwd, values.project ?? env[ENV.project] ?? '.');
   assertGodotProject(projectPath);
+  const lspPort = values['lsp-port'] ?? env[ENV.lspPort];
   return {
     projectPath,
     godotPath: values.godot ?? env[ENV.godot] ?? DEFAULT_GODOT,
     allowEval: values['allow-eval'] === true || isTruthy(env[ENV.allowEval]),
+    ...(lspPort === undefined ? {} : { editorLspPort: parsePort(lspPort) }),
   };
+}
+
+const MAX_PORT = 65_535;
+
+function parsePort(value: string): number {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > MAX_PORT) {
+    throw new ToolError(
+      ErrorCode.InvalidInput,
+      `Invalid port "${value}".`,
+      'Use a number between 1 and 65535.',
+    );
+  }
+  return port;
 }
 
 function assertGodotProject(projectPath: string): void {
